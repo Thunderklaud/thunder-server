@@ -1,3 +1,4 @@
+verbose = 3
 debug = true
 
 [server]

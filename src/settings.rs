@@ -1,17 +1,19 @@
 use config::{Config, ConfigError, Environment, File};
 use rocket::serde::Deserialize;
 use std::env;
+use tracing::{Level, event, instrument};
+use tracing::level_filters::LevelFilter;
 
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
-struct Database {
+pub struct Database {
     url: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
-struct Server {
+pub struct Server {
     url: String,
     port: u8,
 }
@@ -19,15 +21,19 @@ struct Server {
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
 pub struct Settings {
-    app_name: String,
-    debug: bool,
-    database: Database,
-    server: Server,
+    pub app_name: String,
+    pub verbose: u8,
+    pub debug: bool,
+    pub database: Database,
+    pub server: Server,
 }
 
 impl Settings {
+    #[instrument]
     pub fn new() -> Result<Self, ConfigError> {
-        let run_mode = env::var("RUN_MODE").unwrap_or_else(|_| "development".into());
+        event!(Level::INFO, "generate new settings");
+
+        let run_mode = if cfg!(debug_assertions) { "development" } else { "production" };
 
         let s = Config::builder()
             // Start off by merging in the "default" configuration file
