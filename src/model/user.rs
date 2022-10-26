@@ -1,38 +1,26 @@
-use std;
-use std::io;
-use bson;
-use bson::doc;
-use bson::oid::ObjectId;
-use mongodb::ThreadedClient;
+use serde::{Serialize, Deserialize};
+use wither::{prelude::*, Result};
+use wither::bson::{doc, oid::ObjectId};
 
-use crate::{database, SETTINGS};
+use crate::database;
 
-#[derive(Debug)]
-pub struct Model {
+// Define a model. Simple as deriving a few traits.
+#[derive(Debug, Model, Serialize, Deserialize)]
+#[model(index(keys = r#"doc!{"email": 1}"#, options = r#"doc!{"unique": true}"#))]
+struct User {
+    /// The ID of the model.
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
     pub email: String,
     pub pw_hash: String,
     pub role: String,
 }
 
-impl Model {
-    pub fn to_bson(&self) -> bson::ordered::OrderedDocument {
-        doc! {
-          "email": self.email.to_owned(),
-          "pw_hash": self.pw_hash.to_owned(),
-          "role": self.role.to_owned(),
-        }
-    }
+impl User {
+    pub async fn create(&mut self) -> Result<()> {
+        let db = database::establish_connection().await.unwrap();
+        User::sync(&db).await?;
 
-    pub async fn create(&self) -> Result<std::option::Option<bson::ordered::OrderedDocument>, io::Error> {
-        let client = database::establish_connection();
-        let settings = SETTINGS.get().unwrap();
-        let collection = client.db(&settings.database.name).collection("users");
-        collection.insert_one(self.to_bson().clone(), None)
-            .ok().expect("Failed to insert user.");
-
-        let response_document = collection.find_one(Some(self.to_bson().clone()), None)
-            .ok().expect("Failed to execute find user.");
-
-        Ok(response_document)
+        self.save(&db, None).await
     }
 }

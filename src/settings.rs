@@ -1,8 +1,6 @@
 use config::{Config, ConfigError, Environment, File};
 use rocket::serde::Deserialize;
-use std::env;
 use tracing::{Level, event, instrument};
-use tracing::level_filters::LevelFilter;
 
 
 #[derive(Debug, Deserialize)]

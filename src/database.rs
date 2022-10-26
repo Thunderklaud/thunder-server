@@ -1,14 +1,9 @@
-use std;
-use std::env;
-
-use mongodb::{Client, options::ClientOptions, ThreadedClient};
+use wither::mongodb::{Client, Database};
 use crate::SETTINGS;
 
-pub async fn establish_connection() -> Client {
+pub async fn establish_connection() -> Option<Database> {
     let settings = SETTINGS.get().unwrap();
-    let mut client_options = ClientOptions::parse(&settings.database.url).await?;
-
-    let client = Client::with_options(client_options)?;
-
-    client
+    let client = Client::with_uri_str(&settings.database.url).await;
+    if client.is_err() { return None; }
+    Some(client.unwrap().database(&settings.database.name))
 }
