@@ -6,4 +6,5 @@ port = "8080"
 url = "http://localhost:8080"
 
 [database]
-url = "postgres://postgres@localhost"
+url = "mongodb://localhost:27017"
+name = "thunder"

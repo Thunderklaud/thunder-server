@@ -2,6 +2,9 @@
 extern crate rocket;
 
 mod settings;
+mod database;
+mod model;
+mod controller;
 
 use anyhow::Result;
 use once_cell::sync::OnceCell;

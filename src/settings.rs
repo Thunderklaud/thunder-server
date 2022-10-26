@@ -8,14 +8,15 @@ use tracing::level_filters::LevelFilter;
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
 pub struct Database {
-    url: String,
+    pub url: String,
+    pub name: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
 pub struct Server {
-    url: String,
-    port: u8,
+    pub url: String,
+    pub port: u8,
 }
 
 #[derive(Debug, Deserialize)]
