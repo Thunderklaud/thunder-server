@@ -58,3 +58,20 @@ impl Settings {
         s.try_deserialize()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn init() {
+        let settings_result = Settings::new();
+        assert_eq!(settings_result.is_ok(), true);
+    }
+
+    #[test]
+    fn get_bool_value() {
+        let settings = Settings::new().unwrap();
+        assert_eq!(settings.debug, true);
+    }
+}

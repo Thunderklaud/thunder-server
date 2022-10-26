@@ -32,3 +32,14 @@ async fn main() {
         ])
         .launch().await;*/
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_settings() {
+        let settings_result = settings::Settings::new();
+        assert_eq!(settings_result.is_ok(), true);
+    }
+}
