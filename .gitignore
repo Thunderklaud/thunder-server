@@ -1,0 +1,8 @@
+# secret config
+config/local.toml
+
+# artifacts
+target
+
+# IDE
+.idea
