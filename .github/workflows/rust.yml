@@ -1,0 +1,47 @@
+name: Rust
+
+on:
+  push:
+    # Don't run tests, when only text files were modified
+    paths-ignore:
+      - 'COPYRIGHT'
+      - 'LICENSE-*'
+      - '**.md'
+      - '**.txt'
+    branches-ignore:
+      - '**.tmp'
+      - 'staging'
+      - 'trying'
+  pull_request:
+    # Don't run tests, when only text files were modified
+    paths-ignore:
+      - 'COPYRIGHT'
+      - 'LICENSE-*'
+      - '**.md'
+      - '**.txt'
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: "-Dwarnings"
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+
+    # Setup
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-10-25
+          components: cargo, clippy, rustfmt
+      - run: rustc -vV
+      - run: cargo build
+
+      # Tests
+      - run: cargo test
+      - run: cargo clippy
+      - run: cargo fmt --check
+      - run: cargo doc
