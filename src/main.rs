@@ -1,16 +1,16 @@
 extern crate rocket;
 
-mod settings;
+mod controller;
 mod database;
 mod model;
-mod controller;
+mod settings;
 
 use anyhow::Result;
 use once_cell::sync::OnceCell;
-use rocket::{Route};
-use rocket::http::{Method::{Post}};
+use rocket::http::Method::Post;
+use rocket::Route;
 use tracing::level_filters::LevelFilter;
-use tracing::{Level, event};
+use tracing::{event, Level};
 
 static SETTINGS: OnceCell<settings::Settings> = OnceCell::new();
 
@@ -36,18 +36,22 @@ async fn main() -> Result<()> {
     println!("{:?}", SETTINGS);
 
     rocket::build()
-        .mount("/v1/user", vec![
-            /*Route::new(Post, "/login", controller::user::login),
-            Route::new(Post, "/logout", controller::user::logout),*/
-            Route::new(Post, "/registration", controller::user::register),
-        ])
+        .mount(
+            "/v1/user",
+            vec![
+                /*Route::new(Post, "/login", controller::user::login),
+                Route::new(Post, "/logout", controller::user::logout),*/
+                Route::new(Post, "/registration", controller::user::register),
+            ],
+        )
         /*.mount("/v1/data", vec![
             Route::new(Get, "/test", controller::file::test),
             Route::new(Post, "/file", controller::file::create),
             Route::new(Put, "/file", controller::file::upload),
             Route::new(Get, "/file", controller::file::download),
         ])*/
-        .launch().await;
+        .launch()
+        .await;
 
     Ok(())
 }

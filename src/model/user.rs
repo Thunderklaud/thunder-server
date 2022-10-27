@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use wither::{prelude::*, Result};
+use serde::{Deserialize, Serialize};
 use wither::bson::{doc, oid::ObjectId};
+use wither::{prelude::*, Result};
 
 use crate::database;
 

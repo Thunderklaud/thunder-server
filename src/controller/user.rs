@@ -1,8 +1,8 @@
 //use futures::AsyncWrite;
 //use rocket::http::Status;
-use rocket::{route, Data, Request};
 use rocket::tokio::runtime::Runtime;
-use tracing::{Level, event};
+use rocket::{route, Data, Request};
+use tracing::{event, Level};
 
 use crate::model;
 /*
@@ -35,7 +35,7 @@ pub fn register<'r>(req: &'r Request, _data: Data<'r>) -> route::BoxFuture<'r> {
         id: None,
         email: "mail@example.com".to_string(),
         pw_hash: "".to_string(),
-        role: "testrole".to_string()
+        role: "testrole".to_string(),
     };
     let user_save_result = tokio_runtime.handle().block_on(new_user.create());
     if user_save_result.is_ok() {
