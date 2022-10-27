@@ -1,0 +1,64 @@
+name: Rust
+
+on:
+  push:
+    # Don't run tests, when only text files were modified
+    paths-ignore:
+      - 'COPYRIGHT'
+      - 'LICENSE-*'
+      - '**.md'
+      - '**.txt'
+    branches-ignore:
+      - '**.tmp'
+      - 'staging'
+      - 'trying'
+  pull_request:
+    # Don't run tests, when only text files were modified
+    paths-ignore:
+      - 'COPYRIGHT'
+      - 'LICENSE-*'
+      - '**.md'
+      - '**.txt'
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: "-Dwarnings"
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  format:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: cargo, rustfmt
+      - run: rustc -vV
+      - run: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
+      - run: cargo fmt --all -- --check
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: cargo
+      - run: rustc -vV
+      - run: cargo test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: cargo
+      - run: rustc -vV
+      - run: cargo build
+      - run: cargo doc

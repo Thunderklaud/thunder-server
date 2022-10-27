@@ -2716,7 +2716,6 @@ dependencies = [
  "anyhow",
  "config",
  "futures",
- "mongodb 2.3.1",
  "once_cell",
  "rocket",
  "rocket_db_pools",
