@@ -27,20 +27,38 @@ env:
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  rust:
+  format:
+    name: cargo fmt
     runs-on: ubuntu-latest
-
-    # Setup
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-10-25
+          toolchain: nightly
           components: cargo, rustfmt
       - run: rustc -vV
-      - run: cargo build
+      - run: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
+      - run: cargo fmt --all -- --check
 
-      # Tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: cargo
+      - run: rustc -vV
       - run: cargo test
-      - run: cargo fmt --check
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: cargo
+      - run: rustc -vV
+      - run: cargo build
       - run: cargo doc
