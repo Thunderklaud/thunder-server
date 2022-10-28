@@ -1,8 +1,7 @@
-//use futures::AsyncWrite;
-//use rocket::http::Status;
-use rocket::tokio::runtime::Runtime;
-use rocket::{route, Data, Request};
+use std::ops::Add;
+use actix_web::{Responder, web, Result, HttpResponse};
 use tracing::{event, Level};
+use serde::{Deserialize, Serialize};
 
 use crate::model;
 /*
@@ -23,14 +22,25 @@ pub fn logout<'r>(req: &'r Request, data: Data<'r>) -> route::BoxFuture<'r> {
     route::Outcome::from(req, param).pin()
 }*/
 
-pub fn register<'r>(req: &'r Request, _data: Data<'r>) -> route::BoxFuture<'r> {
-    let tokio_runtime = Runtime::new().unwrap();
+#[derive(Deserialize)]
+pub struct FormData {
+    name: String,
+}
 
-    let param = req
-        .param::<&'r str>(0)
-        .and_then(Result::ok)
-        .unwrap_or("unnamed");
+#[derive(Serialize)]
+struct MyObj {
+    name: String,
+}
 
+pub async fn register(form: web::Form<FormData>) -> Result<impl Responder> {
+    event!(Level::WARN, "user controller called");
+    let obj = MyObj {
+        name: form.name.to_string(),
+    };
+    Ok(web::Json(obj))
+    //HttpResponse::Ok().body(format!("username: {}", form.name))
+
+    /*
     let mut new_user = model::user::User {
         id: None,
         email: "mail@example.com".to_string(),
@@ -43,6 +53,5 @@ pub fn register<'r>(req: &'r Request, _data: Data<'r>) -> route::BoxFuture<'r> {
     } else {
         event!(Level::WARN, "user creation failed");
     }
-
-    route::Outcome::from(req, param).pin()
+     */
 }

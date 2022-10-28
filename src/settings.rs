@@ -1,5 +1,5 @@
 use config::{Config, ConfigError, Environment, File};
-use rocket::serde::Deserialize;
+use serde::Deserialize;
 use tracing::{event, instrument, Level};
 
 #[derive(Debug, Deserialize)]
@@ -13,7 +13,8 @@ pub struct Database {
 #[allow(unused)]
 pub struct Server {
     pub url: String,
-    pub port: u8,
+    pub port: u16,
+    pub address: String,
 }
 
 #[derive(Debug, Deserialize)]

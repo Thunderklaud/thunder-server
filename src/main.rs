@@ -1,4 +1,4 @@
-extern crate rocket;
+use actix_web::{web, App, HttpServer, Responder};
 
 mod controller;
 mod database;
@@ -7,22 +7,19 @@ mod settings;
 
 use anyhow::Result;
 use once_cell::sync::OnceCell;
-use rocket::http::Method::Post;
-use rocket::Route;
 use tracing::level_filters::LevelFilter;
 use tracing::{event, Level};
 
 static SETTINGS: OnceCell<settings::Settings> = OnceCell::new();
 
-#[rocket::main]
-#[allow(unused_must_use)]
+#[actix_web::main]
 async fn main() -> Result<()> {
     let settings = settings::Settings::new()?;
     SETTINGS.set(settings).unwrap();
     let settings = SETTINGS.get().unwrap();
 
     tracing_subscriber::fmt()
-        .with_max_level(match settings.verbose {
+        .with_max_level(match &settings.verbose {
             0 => LevelFilter::WARN,
             1 => LevelFilter::INFO,
             2 => LevelFilter::DEBUG,
@@ -35,25 +32,19 @@ async fn main() -> Result<()> {
     // Print out our settings
     println!("{:?}", SETTINGS);
 
-    rocket::build()
-        .mount(
-            "/v1/user",
-            vec![
-                /*Route::new(Post, "/login", controller::user::login),
-                Route::new(Post, "/logout", controller::user::logout),*/
-                Route::new(Post, "/registration", controller::user::register),
-            ],
-        )
-        /*.mount("/v1/data", vec![
-            Route::new(Get, "/test", controller::file::test),
-            Route::new(Post, "/file", controller::file::create),
-            Route::new(Put, "/file", controller::file::upload),
-            Route::new(Get, "/file", controller::file::download),
-        ])*/
-        .launch()
-        .await;
+    HttpServer::new(|| {
+        App::new().service(
+            web::scope("/v1").service(
+                web::scope("/user")
+                    .route("/registration", web::post().to(controller::user::register)),
 
-    Ok(())
+            )
+        )
+    })
+        .workers(2)
+        .bind((settings.server.address.as_str(), settings.server.port))?
+        .run()
+        .await.map_err(anyhow::Error::from)
 }
 
 #[cfg(test)]
