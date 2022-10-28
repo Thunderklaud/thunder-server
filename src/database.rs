@@ -1,5 +1,6 @@
-use crate::SETTINGS;
 use mongodb::{Client, Collection, Database};
+
+use crate::SETTINGS;
 
 pub trait MyDBModel {}
 

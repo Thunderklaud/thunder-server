@@ -1,14 +1,13 @@
 use actix_web::{web, App, HttpServer};
+use anyhow::Result;
+use once_cell::sync::OnceCell;
+use tracing::level_filters::LevelFilter;
+use tracing::{event, Level};
 
 mod controller;
 mod database;
 mod model;
 mod settings;
-
-use anyhow::Result;
-use once_cell::sync::OnceCell;
-use tracing::level_filters::LevelFilter;
-use tracing::{event, Level};
 
 static SETTINGS: OnceCell<settings::Settings> = OnceCell::new();
 
@@ -33,18 +32,15 @@ async fn main() -> Result<()> {
     println!("{:?}", SETTINGS);
 
     HttpServer::new(|| {
-        App::new().service(
-            web::scope("/v1").service(
-                web::scope("/user")
-                    .route("/registration", web::post().to(controller::user::register)),
-
-            )
-        )
+        App::new().service(web::scope("/v1").service(
+            web::scope("/user").route("/registration", web::post().to(controller::user::register)),
+        ))
     })
-        .workers(2)
-        .bind((settings.server.address.as_str(), settings.server.port))?
-        .run()
-        .await.map_err(anyhow::Error::from)
+    .workers(2)
+    .bind((settings.server.address.as_str(), settings.server.port))?
+    .run()
+    .await
+    .map_err(anyhow::Error::from)
 }
 
 #[cfg(test)]

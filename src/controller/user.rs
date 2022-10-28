@@ -1,4 +1,4 @@
-use actix_web::{web::{Json}, HttpResponse};
+use actix_web::{web::Json, HttpResponse};
 use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use tracing::{event, Level};

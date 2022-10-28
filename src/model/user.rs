@@ -1,12 +1,9 @@
-use serde::{Deserialize, Serialize};
 use mongodb::{
-    bson::{
-        extjson::de::Error,
-        oid::ObjectId,
-    },
-    results::{InsertOneResult},
+    bson::{extjson::de::Error, oid::ObjectId},
+    results::InsertOneResult,
     Collection,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::database;
 use crate::database::MyDBModel;
@@ -22,12 +19,14 @@ pub struct User {
 }
 
 impl MyDBModel for User {}
+
 impl User {
     pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
         //let db = database::establish_connection().await.unwrap();
         //let col: Collection<User> = db.collection("User");
         let col: Collection<User> = database::get_collection("User").await.clone_with_type();
-        let user = col.insert_one(self, None)
+        let user = col
+            .insert_one(self, None)
             .await
             .expect("Error creating user");
         Ok(user)
