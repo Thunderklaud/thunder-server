@@ -1,5 +1,7 @@
 use crate::SETTINGS;
-use wither::mongodb::{Client, Database};
+use mongodb::{Client, Collection, Database};
+
+pub trait MyDBModel {}
 
 pub async fn establish_connection() -> Option<Database> {
     let settings = SETTINGS.get().unwrap();

@@ -7,5 +7,5 @@ address = "localhost"
 url = "http://localhost:8000"
 
 [database]
-url = "mongodb://localhost:27017"
+url = "mongodb://root:example@localhost:27017"
 name = "thunder"

@@ -1,26 +1,34 @@
 use serde::{Deserialize, Serialize};
-use wither::bson::{doc, oid::ObjectId};
-use wither::{prelude::*, Result};
+use mongodb::{
+    bson::{
+        extjson::de::Error,
+        oid::ObjectId,
+    },
+    results::{InsertOneResult},
+    Collection,
+};
 
 use crate::database;
+use crate::database::MyDBModel;
 
 // Define a model. Simple as deriving a few traits.
-#[derive(Debug, Model, Serialize, Deserialize)]
-#[model(index(keys = r#"doc!{"email": 1}"#, options = r#"doc!{"unique": true}"#))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct User {
-    /// The ID of the model.
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<ObjectId>,
-    pub email: String,
-    pub pw_hash: String,
-    pub role: String,
+    pub name: String,
+    pub location: String,
+    pub title: String,
 }
 
+impl MyDBModel for User {}
 impl User {
-    pub async fn create(&mut self) -> Result<()> {
+    pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
         let db = database::establish_connection().await.unwrap();
-        User::sync(&db).await?;
-
-        self.save(&db, None).await
+        let col: Collection<User> = db.collection("User");
+        let user = col.insert_one(self, None)
+            .await
+            .expect("Error creating user");
+        Ok(user)
     }
 }
