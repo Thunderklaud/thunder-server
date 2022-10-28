@@ -11,3 +11,8 @@ pub async fn establish_connection() -> Option<Database> {
     }
     Some(client.unwrap().database(&settings.database.name))
 }
+
+pub async fn get_collection(cname: &str) -> Collection<Box<dyn MyDBModel>> {
+    let db = establish_connection().await.unwrap();
+    db.collection(cname)
+}
