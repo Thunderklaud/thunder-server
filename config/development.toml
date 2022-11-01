@@ -2,9 +2,10 @@ verbose = 3
 debug = true
 
 [server]
-port = "8080"
-url = "http://localhost:8080"
+port = "8000"
+address = "localhost"
+url = "http://localhost:8000"
 
 [database]
-url = "mongodb://localhost:27017"
+url = "mongodb://root:example@localhost:27017"
 name = "thunder"

@@ -3,6 +3,7 @@ debug = false
 
 [server]
 port = "8080"
+address = "localhost"
 url = "http://localhost:8080"
 
 [database]
