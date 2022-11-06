@@ -27,12 +27,20 @@ enum ResultDataType {
     LoginResponse(LoginResponse),
     #[serde(rename(serialize = "result"))]
     InsertOneResult(InsertOneResult),
+    #[serde(rename(serialize = "result"))]
+    TestResponse(TestResponse),
 }
 
 #[derive(Serialize)]
 struct LoginResponse {
-    bearer_token: String,
+    jwt: String,
     claims: Claims,
+}
+
+#[derive(Serialize)]
+struct TestResponse {
+    session_info: Authenticated<Claims>,
+    email: String,
 }
 
 pub async fn login(login_user: Json<UserLogin>,
@@ -54,7 +62,7 @@ pub async fn login(login_user: Json<UserLogin>,
             &jwt_encoding_key,
         ).unwrap();
         let login_response = LoginResponse {
-            bearer_token: jwt_token,
+            jwt: jwt_token,
             claims: jwt_claims,
         };
 
@@ -69,6 +77,17 @@ pub async fn login(login_user: Json<UserLogin>,
         result: None,
         status: false,
         error: "User with email does not exist".parse().unwrap(),
+    })
+}
+
+pub async fn test(authenticated: Authenticated<Claims>) -> HttpResponse {
+    HttpResponse::Ok().json(DefaultResponse {
+        result: Some(ResultDataType::TestResponse(TestResponse {
+            session_info: authenticated.clone(),
+            email: User::get_authenticated(&authenticated).await.unwrap().email,
+        }).into()),
+        status: true,
+        error: "".to_string(),
     })
 }
 
