@@ -8,10 +8,8 @@ on:
       - 'LICENSE-*'
       - '**.md'
       - '**.txt'
-    branches-ignore:
-      - '**.tmp'
-      - 'staging'
-      - 'trying'
+    branches:
+      - 'master'
   pull_request:
     # Don't run tests, when only text files were modified
     paths-ignore:
