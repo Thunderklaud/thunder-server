@@ -1,9 +1,14 @@
+use actix_jwt_authc::Authenticated;
 use actix_web::{web::Json, HttpResponse};
+use actix_web::web::Data;
+use jsonwebtoken::EncodingKey;
 use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use tracing::{event, Level};
+use crate::Claims;
+use crate::jwt_utils::JWTTtl;
 
-use crate::model::user::User;
+use crate::model::user::{Role, User};
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
@@ -13,13 +18,21 @@ pub struct DefaultResponse {
 }
 
 pub async fn register(new_user: Json<User>) -> HttpResponse {
-    event!(Level::WARN, "user controller called");
+    if User::exists(&new_user.email).await {
+        return HttpResponse::InternalServerError().json(DefaultResponse {
+            result: None,
+            status: false,
+            error: "User with email already exists".parse().unwrap(),
+        })
+    }
 
     let mut data = User {
         id: None,
-        name: new_user.name.to_owned(),
-        location: new_user.location.to_owned(),
-        title: new_user.title.to_owned(),
+        firstname: new_user.firstname.to_owned(),
+        lastname: new_user.lastname.to_owned(),
+        email: new_user.email.to_owned(),
+        pw_hash: new_user.pw_hash.to_owned(),
+        role: Some(Role::BaseUser)
     };
     let user_detail = data.create().await;
     match user_detail {
@@ -30,7 +43,7 @@ pub async fn register(new_user: Json<User>) -> HttpResponse {
         }),
         Err(err) => HttpResponse::InternalServerError().json(DefaultResponse {
             result: None,
-            status: true,
+            status: false,
             error: err.to_string(),
         }),
     }
