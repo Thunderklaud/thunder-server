@@ -52,16 +52,17 @@ impl InvalidatedJWTStore {
         )
     }
 
-    pub async fn add_to_invalidated(&self, authenticated: Authenticated<Claims>) {
+    pub async fn add_to_invalidated(&self, authenticated: Authenticated<Claims>) -> bool {
         self.store.insert(authenticated.jwt.clone());
         let mut tx = self.tx.lock().await;
         if let Err(_e) = tx
             .send(InvalidatedTokensEvent::Add(authenticated.jwt))
-            .await
-        {
+            .await {
             #[cfg(feature = "tracing")]
-            error!(error = ?_e, "Failed to send update on adding to invalidated")
+            error!(error = ?_e, "Failed to send update on adding to invalidated");
+            return false;
         }
+        true
     }
 }
 

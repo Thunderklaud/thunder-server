@@ -9,7 +9,7 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};
 
-use crate::Claims;
+use crate::{Claims, InvalidatedJWTStore};
 use crate::jwt_utils::{JWT_SIGNING_ALGO, JWTTtl};
 use crate::model::user::{Role, User, UserLogin};
 
@@ -87,6 +87,14 @@ pub async fn test(authenticated: Authenticated<Claims>) -> HttpResponse {
             email: User::get_authenticated(&authenticated).await.unwrap().email,
         }).into()),
         status: true,
+        error: "".to_string(),
+    })
+}
+
+pub async fn logout(invalidated_jwts: Data<InvalidatedJWTStore>, authenticated: Authenticated<Claims>) -> HttpResponse {
+    HttpResponse::Ok().json(DefaultResponse {
+        result: None,
+        status: invalidated_jwts.add_to_invalidated(authenticated).await,
         error: "".to_string(),
     })
 }
