@@ -1,20 +1,38 @@
+use std::ops::Add;
+
 use actix_jwt_authc::Authenticated;
-use actix_web::{web::Json, HttpResponse};
+use actix_web::{HttpResponse, web::Json};
 use actix_web::web::Data;
-use jsonwebtoken::EncodingKey;
+use jsonwebtoken::{encode, EncodingKey, Header};
 use mongodb::results::InsertOneResult;
 use serde::Serialize;
+use time::OffsetDateTime;
 use tracing::{event, Level};
-use crate::Claims;
-use crate::jwt_utils::JWTTtl;
 
+use crate::Claims;
+use crate::jwt_utils::{JWT_SIGNING_ALGO, JWTTtl};
 use crate::model::user::{Role, User, UserLogin};
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
-    result: Option<InsertOneResult>,
+    #[serde(flatten)]
+    result: Option<ResultDataType>,
     status: bool,
     error: String,
+}
+
+#[derive(Serialize)]
+enum ResultDataType {
+    #[serde(rename(serialize = "result"))]
+    LoginResponse(LoginResponse),
+    #[serde(rename(serialize = "result"))]
+    InsertOneResult(InsertOneResult),
+}
+
+#[derive(Serialize)]
+struct LoginResponse {
+    bearer_token: String,
+    claims: Claims,
 }
 
 pub async fn login(login_user: Json<UserLogin>,
@@ -22,19 +40,36 @@ pub async fn login(login_user: Json<UserLogin>,
                    jwt_ttl: Data<JWTTtl>) -> HttpResponse {
     event!(Level::INFO, "login_user: {}", login_user.email);
 
-    if !User::exists(&login_user.email).await {
-        return HttpResponse::InternalServerError().json(DefaultResponse {
-            result: None,
-            status: false,
-            error: "User with email does not exist".parse().unwrap(),
-        })
+    let user = User::get_by_email(login_user.email.to_owned().as_str()).await;
+    if user.is_some() {
+        let sub = user.unwrap().id.unwrap().to_string();
+        let iat = OffsetDateTime::now_utc().unix_timestamp() as usize;
+        let expires_at = OffsetDateTime::now_utc().add(jwt_ttl.0);
+        let exp = expires_at.unix_timestamp() as usize;
+
+        let jwt_claims = Claims { iat, exp, sub };
+        let jwt_token = encode(
+            &Header::new(JWT_SIGNING_ALGO),
+            &jwt_claims,
+            &jwt_encoding_key,
+        ).unwrap();
+        let login_response = LoginResponse {
+            bearer_token: jwt_token,
+            claims: jwt_claims,
+        };
+
+        return HttpResponse::Ok().json(DefaultResponse {
+            result: Some(ResultDataType::LoginResponse(login_response).into()),
+            status: true,
+            error: "".to_string(),
+        });
     }
 
-    HttpResponse::Ok().json(login_user)
-}
-
-pub async fn session_info(authenticated: Authenticated<Claims>) -> HttpResponse {
-    HttpResponse::Ok().json(authenticated)
+    HttpResponse::InternalServerError().json(DefaultResponse {
+        result: None,
+        status: false,
+        error: "User with email does not exist".parse().unwrap(),
+    })
 }
 
 pub async fn register(new_user: Json<User>) -> HttpResponse {
@@ -43,7 +78,7 @@ pub async fn register(new_user: Json<User>) -> HttpResponse {
             result: None,
             status: false,
             error: "User with email already exists".parse().unwrap(),
-        })
+        });
     }
 
     let mut data = User {
@@ -52,12 +87,12 @@ pub async fn register(new_user: Json<User>) -> HttpResponse {
         lastname: new_user.lastname.to_owned(),
         email: new_user.email.to_owned(),
         pw_hash: new_user.pw_hash.to_owned(),
-        role: Some(Role::BaseUser)
+        role: Some(Role::BaseUser),
     };
     let user_detail = data.create().await;
     match user_detail {
         Ok(user) => HttpResponse::Ok().json(DefaultResponse {
-            result: Some(user),
+            result: Some(ResultDataType::InsertOneResult(user)),
             status: true,
             error: "".to_string(),
         }),

@@ -1,16 +1,16 @@
 use std::sync::Arc;
+
 use actix_jwt_authc::*;
 use dashmap::DashSet;
-use futures::channel::{mpsc, mpsc::{channel, Sender}};
 use futures::{SinkExt, Stream};
+use futures::channel::{mpsc, mpsc::Sender};
 use jsonwebtoken::*;
 use ring::rand::SystemRandom;
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
-use time::ext::*;
 use tokio::sync::Mutex;
 
-const JWT_SIGNING_ALGO: Algorithm = Algorithm::EdDSA;
+pub const JWT_SIGNING_ALGO: Algorithm = Algorithm::EdDSA;
 
 pub struct JwtSigningKeys {
     pub encoding_key: EncodingKey,
@@ -38,9 +38,8 @@ pub struct InvalidatedJWTStore {
 }
 
 impl InvalidatedJWTStore {
-
     /// Returns a [InvalidatedJWTStore] with a Stream of [InvalidatedTokensEvent]s
-    pub fn new_with_stream() -> (InvalidatedJWTStore, impl Stream<Item = InvalidatedTokensEvent>) {
+    pub fn new_with_stream() -> (InvalidatedJWTStore, impl Stream<Item=InvalidatedTokensEvent>) {
         let invalidated = Arc::new(DashSet::new());
         let (tx, rx) = mpsc::channel(100);
         let tx_to_hold = Arc::new(Mutex::new(tx));
@@ -75,9 +74,9 @@ pub struct JWTTtl(pub time::Duration);
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Claims {
-    exp: usize,
-    iat: usize,
-    sub: String,
+    pub exp: usize,
+    pub iat: usize,
+    pub sub: String,
 }
 
 pub fn get_auth_middleware_settings(jwt_signing_keys: &JwtSigningKeys) -> AuthenticateMiddlewareSettings {

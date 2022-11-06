@@ -1,3 +1,5 @@
+use std::str::FromStr;
+use actix_jwt_authc::Authenticated;
 use mongodb::{
     bson::{extjson::de::Error, oid::ObjectId},
     results::InsertOneResult,
@@ -5,8 +7,9 @@ use mongodb::{
 };
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
+use tracing::{event, Level};
 
-use crate::database;
+use crate::{Claims, database};
 use crate::database::MyDBModel;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,6 +47,21 @@ impl User {
             .await
             .expect("Error creating user");
         Ok(user)
+    }
+
+    pub async fn get_authenticated(authenticated: &Authenticated<Claims>) -> Option<User> {
+        event!(Level::INFO, "get_authenticated: {}", authenticated.claims.sub.as_str());
+        User::get_by_oid(authenticated.claims.sub.as_str()).await
+    }
+
+    pub async fn get_by_oid(oid: &str) -> Option<User> {
+        let col: Collection<User> = database::get_collection("User").await.clone_with_type();
+        col.find_one(
+            doc! {
+                "_id": ObjectId::from_str(oid).unwrap()
+            },
+            None,
+        ).await.expect("User not found")
     }
 
     pub async fn get_by_email(email: &str) -> Option<User> {
