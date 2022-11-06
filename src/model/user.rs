@@ -28,6 +28,12 @@ pub enum Role {
 
 impl MyDBModel for User {}
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserLogin {
+    pub email: String,
+    pub pw_hash: String,
+}
+
 impl User {
     pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
         //let db = database::establish_connection().await.unwrap();

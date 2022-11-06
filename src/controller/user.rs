@@ -8,13 +8,33 @@ use tracing::{event, Level};
 use crate::Claims;
 use crate::jwt_utils::JWTTtl;
 
-use crate::model::user::{Role, User};
+use crate::model::user::{Role, User, UserLogin};
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
     result: Option<InsertOneResult>,
     status: bool,
     error: String,
+}
+
+pub async fn login(login_user: Json<UserLogin>,
+                   jwt_encoding_key: Data<EncodingKey>,
+                   jwt_ttl: Data<JWTTtl>) -> HttpResponse {
+    event!(Level::INFO, "login_user: {}", login_user.email);
+
+    if !User::exists(&login_user.email).await {
+        return HttpResponse::InternalServerError().json(DefaultResponse {
+            result: None,
+            status: false,
+            error: "User with email does not exist".parse().unwrap(),
+        })
+    }
+
+    HttpResponse::Ok().json(login_user)
+}
+
+pub async fn session_info(authenticated: Authenticated<Claims>) -> HttpResponse {
+    HttpResponse::Ok().json(authenticated)
 }
 
 pub async fn register(new_user: Json<User>) -> HttpResponse {
