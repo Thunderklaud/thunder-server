@@ -1,17 +1,17 @@
 use std::ops::Add;
 
 use actix_jwt_authc::Authenticated;
-use actix_web::{HttpResponse, web::Json};
 use actix_web::web::Data;
+use actix_web::{web::Json, HttpResponse};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};
 
-use crate::{Claims, InvalidatedJWTStore};
-use crate::jwt_utils::{JWT_SIGNING_ALGO, JWTTtl};
+use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
 use crate::model::user::{Role, User, UserLogin};
+use crate::{Claims, InvalidatedJWTStore};
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
@@ -43,9 +43,11 @@ struct TestResponse {
     email: String,
 }
 
-pub async fn login(login_user: Json<UserLogin>,
-                   jwt_encoding_key: Data<EncodingKey>,
-                   jwt_ttl: Data<JWTTtl>) -> HttpResponse {
+pub async fn login(
+    login_user: Json<UserLogin>,
+    jwt_encoding_key: Data<EncodingKey>,
+    jwt_ttl: Data<JWTTtl>,
+) -> HttpResponse {
     event!(Level::INFO, "login_user: {}", login_user.email);
 
     let user = User::get_by_email(login_user.email.to_owned().as_str()).await;
@@ -60,7 +62,9 @@ pub async fn login(login_user: Json<UserLogin>,
             &Header::new(JWT_SIGNING_ALGO),
             &jwt_claims,
             &jwt_encoding_key,
-        ).unwrap();
+        )
+        .unwrap();
+
         let login_response = LoginResponse {
             jwt: jwt_token,
             claims: jwt_claims,
@@ -82,16 +86,22 @@ pub async fn login(login_user: Json<UserLogin>,
 
 pub async fn test(authenticated: Authenticated<Claims>) -> HttpResponse {
     HttpResponse::Ok().json(DefaultResponse {
-        result: Some(ResultDataType::TestResponse(TestResponse {
-            session_info: authenticated.clone(),
-            email: User::get_authenticated(&authenticated).await.unwrap().email,
-        }).into()),
+        result: Some(
+            ResultDataType::TestResponse(TestResponse {
+                session_info: authenticated.clone(),
+                email: User::get_authenticated(&authenticated).await.unwrap().email,
+            })
+            .into(),
+        ),
         status: true,
         error: "".to_string(),
     })
 }
 
-pub async fn logout(invalidated_jwts: Data<InvalidatedJWTStore>, authenticated: Authenticated<Claims>) -> HttpResponse {
+pub async fn logout(
+    invalidated_jwts: Data<InvalidatedJWTStore>,
+    authenticated: Authenticated<Claims>,
+) -> HttpResponse {
     HttpResponse::Ok().json(DefaultResponse {
         result: None,
         status: invalidated_jwts.add_to_invalidated(authenticated).await,

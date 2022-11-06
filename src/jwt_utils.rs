@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use actix_jwt_authc::*;
 use dashmap::DashSet;
-use futures::{SinkExt, Stream};
 use futures::channel::{mpsc, mpsc::Sender};
+use futures::{SinkExt, Stream};
 use jsonwebtoken::*;
 use ring::rand::SystemRandom;
 use ring::signature::{Ed25519KeyPair, KeyPair};
@@ -39,7 +39,10 @@ pub struct InvalidatedJWTStore {
 
 impl InvalidatedJWTStore {
     /// Returns a [InvalidatedJWTStore] with a Stream of [InvalidatedTokensEvent]s
-    pub fn new_with_stream() -> (InvalidatedJWTStore, impl Stream<Item=InvalidatedTokensEvent>) {
+    pub fn new_with_stream() -> (
+        InvalidatedJWTStore,
+        impl Stream<Item = InvalidatedTokensEvent>,
+    ) {
         let invalidated = Arc::new(DashSet::new());
         let (tx, rx) = mpsc::channel(100);
         let tx_to_hold = Arc::new(Mutex::new(tx));
@@ -57,7 +60,8 @@ impl InvalidatedJWTStore {
         let mut tx = self.tx.lock().await;
         if let Err(_e) = tx
             .send(InvalidatedTokensEvent::Add(authenticated.jwt))
-            .await {
+            .await
+        {
             #[cfg(feature = "tracing")]
             error!(error = ?_e, "Failed to send update on adding to invalidated");
             return false;
@@ -80,7 +84,9 @@ pub struct Claims {
     pub sub: String,
 }
 
-pub fn get_auth_middleware_settings(jwt_signing_keys: &JwtSigningKeys) -> AuthenticateMiddlewareSettings {
+pub fn get_auth_middleware_settings(
+    jwt_signing_keys: &JwtSigningKeys,
+) -> AuthenticateMiddlewareSettings {
     AuthenticateMiddlewareSettings {
         jwt_decoding_key: jwt_signing_keys.decoding_key.clone(),
         jwt_authorization_header_prefixes: Some(vec!["Bearer".to_string()]),

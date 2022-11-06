@@ -1,16 +1,16 @@
-use std::str::FromStr;
 use actix_jwt_authc::Authenticated;
+use mongodb::bson::doc;
 use mongodb::{
     bson::{extjson::de::Error, oid::ObjectId},
     results::InsertOneResult,
     Collection,
 };
-use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use tracing::{event, Level};
 
-use crate::{Claims, database};
 use crate::database::MyDBModel;
+use crate::{database, Claims};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
@@ -50,7 +50,11 @@ impl User {
     }
 
     pub async fn get_authenticated(authenticated: &Authenticated<Claims>) -> Option<User> {
-        event!(Level::INFO, "get_authenticated: {}", authenticated.claims.sub.as_str());
+        event!(
+            Level::INFO,
+            "get_authenticated: {}",
+            authenticated.claims.sub.as_str()
+        );
         User::get_by_oid(authenticated.claims.sub.as_str()).await
     }
 
@@ -61,7 +65,9 @@ impl User {
                 "_id": ObjectId::from_str(oid).unwrap()
             },
             None,
-        ).await.expect("User not found")
+        )
+        .await
+        .expect("User not found")
     }
 
     pub async fn get_by_email(email: &str) -> Option<User> {
@@ -71,10 +77,14 @@ impl User {
                 "email": email
             },
             None,
-        ).await.expect("User not found")
+        )
+        .await
+        .expect("User not found")
     }
 
     pub async fn exists(email: &String) -> bool {
-        User::get_by_email(email.to_owned().as_str()).await.is_some()
+        User::get_by_email(email.to_owned().as_str())
+            .await
+            .is_some()
     }
 }
