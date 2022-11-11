@@ -33,7 +33,7 @@ struct DirectoryGetResponse {
     dirs: Vec<MinimalDirectoryObject>,
 }
 
-pub async fn create(authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPost>) -> HttpResponse {
+pub async fn create(_authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPost>) -> HttpResponse {
     let parent_id = if dir_post_data.parent_id.is_some() && !dir_post_data.parent_id.to_owned().unwrap().is_empty() {
         Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap())
     } else { None };
@@ -51,7 +51,7 @@ pub async fn create(authenticated: Authenticated<Claims>, dir_post_data: Json<Di
     get_default_insert_response(dir_detail)
 }
 
-pub async fn update(authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPatch>) -> HttpResponse {
+pub async fn update(_authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPatch>) -> HttpResponse {
     let dir = Directory::get_by_oid(dir_post_data.id).await;
 
     if dir.is_some() {
@@ -88,7 +88,7 @@ pub async fn update(authenticated: Authenticated<Claims>, dir_post_data: Json<Di
     get_empty_success_response()
 }
 
-pub async fn get(authenticated: Authenticated<Claims>, dir_get_data: Json<DirectoryGet>) -> HttpResponse {
+pub async fn get(_authenticated: Authenticated<Claims>, dir_get_data: Json<DirectoryGet>) -> HttpResponse {
     let mut id = None;
     if dir_get_data.id.is_some() && !dir_get_data.id.to_owned().unwrap().to_string().eq("") {
         id = Some(ObjectId::from_str(dir_get_data.id.to_owned().unwrap().as_str()).unwrap());

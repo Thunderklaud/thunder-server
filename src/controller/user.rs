@@ -83,12 +83,12 @@ pub async fn login(
     })
 }
 
-pub async fn test(authenticated: Authenticated<Claims>) -> HttpResponse {
+pub async fn test(_authenticated: Authenticated<Claims>) -> HttpResponse {
     HttpResponse::Ok().json(DefaultResponse {
         result: Some(
             ResultDataType::TestResponse(TestResponse {
-                session_info: authenticated.clone(),
-                email: User::get_authenticated(&authenticated).await.unwrap().email,
+                session_info: _authenticated.clone(),
+                email: User::get_authenticated(&_authenticated).await.unwrap().email,
             })
             .into(),
         ),
@@ -98,12 +98,12 @@ pub async fn test(authenticated: Authenticated<Claims>) -> HttpResponse {
 }
 
 pub async fn logout(
-    invalidated_jwts: Data<InvalidatedJWTStore>,
-    authenticated: Authenticated<Claims>,
+    _authenticated: Authenticated<Claims>,
+    invalidated_jwts: Data<InvalidatedJWTStore>
 ) -> HttpResponse {
     HttpResponse::Ok().json(DefaultResponse {
         result: None,
-        status: invalidated_jwts.add_to_invalidated(authenticated).await,
+        status: invalidated_jwts.add_to_invalidated(_authenticated).await,
         error: "".to_string(),
     })
 }
