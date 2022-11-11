@@ -37,7 +37,7 @@ pub struct DirectoryPost {
 pub struct DirectoryPatch {
     pub id: ObjectId,                   // the document id of the directory that should be updated
     pub name: Option<String>,           // null or the new name
-    pub parent_id: Option<ObjectId>,      // null or the new parent directory document id
+    pub parent_id: Option<String>,      // null or the new parent directory document id
 }
 
 impl Directory {

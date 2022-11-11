@@ -16,9 +16,13 @@ use crate::model::directory::{Directory, DirectoryPatch, DirectoryPost};
 
 
 pub async fn create(authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPost>) -> HttpResponse {
+    let parent_id = if dir_post_data.parent_id.is_some() && !dir_post_data.parent_id.to_owned().unwrap().is_empty() {
+        Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap())
+    } else { None };
+
     let mut dir = Directory {
         id: None,
-        parent_id: if dir_post_data.parent_id.is_some() { Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap()) } else { None },
+        parent_id,
         name: dir_post_data.name.to_owned().to_string(),
         creation_date: DateTime::now(),
         child_ids: vec![],
@@ -35,7 +39,11 @@ pub async fn update(authenticated: Authenticated<Claims>, dir_post_data: Json<Di
     if dir.is_some() {
         let mut dir = dir.unwrap();
         if dir_post_data.parent_id.is_some() {      // try to move dir if parent_id changes
-            dir.move_to(dir_post_data.parent_id).await;
+            let mut new_parent_id = None;
+            if !dir_post_data.parent_id.to_owned().unwrap().to_string().eq("") {
+                new_parent_id = Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap());
+            }
+            dir.move_to(new_parent_id).await;
         }
         if dir_post_data.name.is_some() {
             dir.name = dir_post_data.name.to_owned().unwrap();
