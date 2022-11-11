@@ -40,24 +40,30 @@ async fn main() -> Result<()> {
     let jwt_signing_keys = JwtSigningKeys::generate().unwrap();
     let auth_middleware_settings = get_auth_middleware_settings(&jwt_signing_keys);
 
-    let (invalidated_jwts_store, stream) = InvalidatedJWTStore::new_with_stream();
+    let (invalidated_jwt_store, stream) = InvalidatedJWTStore::new_with_stream();
     let auth_middleware_factory =
         AuthenticateMiddlewareFactory::<Claims>::new(stream, auth_middleware_settings.clone());
 
     HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(invalidated_jwts_store.clone()))
+            .app_data(Data::new(invalidated_jwt_store.clone()))
             .app_data(Data::new(jwt_signing_keys.encoding_key.clone()))
             .app_data(Data::new(get_jwt_ttl()))
             .wrap(auth_middleware_factory.clone())
             .service(
-                web::scope("/v1").service(
+                web::scope("/v1")
+                    .service(
                     web::scope("/user")
                         .route("/login", web::post().to(controller::user::login))
                         .route("/logout", web::post().to(controller::user::logout))
                         .route("/registration", web::post().to(controller::user::register))
                         .route("/test", web::get().to(controller::user::test)),
-                ),
+                    )
+                    .service(
+                        web::scope("/data")
+                            .route("/directory", web::post().to(controller::directory::create))
+                            .route("/directory", web::patch().to(controller::directory::update)),
+                    ),
             )
     })
     .workers(2)

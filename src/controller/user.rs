@@ -12,6 +12,7 @@ use tracing::{event, Level};
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
 use crate::model::user::{Role, User, UserLogin};
 use crate::{Claims, InvalidatedJWTStore};
+use crate::controller::utils::get_default_insert_response;
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
@@ -25,8 +26,6 @@ pub struct DefaultResponse {
 enum ResultDataType {
     #[serde(rename(serialize = "result"))]
     LoginResponse(LoginResponse),
-    #[serde(rename(serialize = "result"))]
-    InsertOneResult(InsertOneResult),
     #[serde(rename(serialize = "result"))]
     TestResponse(TestResponse),
 }
@@ -127,16 +126,5 @@ pub async fn register(new_user: Json<User>) -> HttpResponse {
         role: Some(Role::BaseUser),
     };
     let user_detail = data.create().await;
-    match user_detail {
-        Ok(user) => HttpResponse::Ok().json(DefaultResponse {
-            result: Some(ResultDataType::InsertOneResult(user)),
-            status: true,
-            error: "".to_string(),
-        }),
-        Err(err) => HttpResponse::InternalServerError().json(DefaultResponse {
-            result: None,
-            status: false,
-            error: err.to_string(),
-        }),
-    }
+    get_default_insert_response(user_detail)
 }
