@@ -13,13 +13,13 @@ use crate::{Claims, database};
 use crate::database::MyDBModel;
 
 static ROOT_DIR_NAME: &str = "/";
-static ROOT_DIR_OID: OnceCell<ObjectId> = OnceCell::new();
+pub static ROOT_DIR_OID: OnceCell<ObjectId> = OnceCell::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directory {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<ObjectId>,
-    pub parent_id: Option<ObjectId>,
+    pub parent_id: Option<ObjectId>,    // needs to be option because root dir has no parent_id
     pub name: String,
     pub creation_date: DateTime,
     pub child_ids: Vec<ObjectId>,
@@ -187,13 +187,13 @@ impl Directory {
             .await
             .expect("Error updating directory")
     }
-    pub async fn move_to(&mut self, new_parent_oid: Option<ObjectId>) {
+    pub async fn move_to(&mut self, new_parent_oid: ObjectId) {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
 
-        if self.id.is_some() && (self.parent_id.is_some() || new_parent_oid.is_some()) {
-            // do not move if parent_id and new_parent_id are equal
+        if self.id.is_some() && self.parent_id.is_some() {
+            // do not move if parent_id and new_parent_id are equal or if someone tries to move root
             // todo: does this check really work?
-            if self.parent_id == new_parent_oid {
+            if self.parent_id.unwrap() == new_parent_oid || ROOT_DIR_OID.get().unwrap().to_owned() == new_parent_oid {
                 return;
             }
 
@@ -213,16 +213,12 @@ impl Directory {
                 .expect("Error giving dir a new parent_id");
 
             // add dir as child id to the new parent
-            if new_parent_oid.is_some() {
-                Directory::add_child_by_oid(new_parent_oid.unwrap(), self.id.unwrap()).await;
-            }
+            Directory::add_child_by_oid(new_parent_oid, self.id.unwrap()).await;
 
             // remove child id from old parent
-            if self.parent_id.is_some() {
-                Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap()).await;
-            }
+            Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap()).await;
 
-            self.parent_id = new_parent_oid;
+            self.parent_id = Some(new_parent_oid);
         }
     }
 }
