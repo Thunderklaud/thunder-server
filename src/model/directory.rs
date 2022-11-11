@@ -1,11 +1,8 @@
 use std::borrow::Borrow;
 use std::str::FromStr;
 
-use mongodb::{
-    bson::{extjson::de::Error, oid::ObjectId},
-    Collection,
-    results::InsertOneResult,
-};
+use futures::StreamExt;
+use mongodb::{bson::{extjson::de::Error, oid::ObjectId}, Collection, Cursor, results::InsertOneResult};
 use mongodb::bson::{DateTime, doc};
 use mongodb::results::UpdateResult;
 use serde::{Deserialize, Serialize};
@@ -35,9 +32,22 @@ pub struct DirectoryPost {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DirectoryPatch {
-    pub id: ObjectId,                   // the document id of the directory that should be updated
-    pub name: Option<String>,           // null or the new name
+    pub id: ObjectId,
+    // the document id of the directory that should be updated
+    pub name: Option<String>,
+    // null or the new name
     pub parent_id: Option<String>,      // null or the new parent directory document id
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DirectoryGet {
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MinimalDirectoryObject {
+    pub id: ObjectId,
+    pub name: String,
 }
 
 impl Directory {
@@ -94,6 +104,28 @@ impl Directory {
         )
             .await
             .expect("Directory not found")
+    }
+    pub async fn get_all_with_parent_id(parent_id: Option<ObjectId>) -> Vec<MinimalDirectoryObject> {
+        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
+        let mut cursor = col.find(
+            doc! {
+                "parent_id": parent_id
+            },
+            None,
+        )
+            .await
+            .expect("Directories by parent_id not found");
+
+        let mut dir_names: Vec<MinimalDirectoryObject> = vec![];
+        while let Some(dir) = cursor.next().await {
+            if dir.is_ok() {
+                dir_names.push(MinimalDirectoryObject {
+                    id: dir.to_owned().unwrap().id.unwrap(),
+                    name: dir.to_owned().unwrap().name
+                });
+            }
+        }
+        dir_names
     }
     pub async fn update(&mut self) -> UpdateResult {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();

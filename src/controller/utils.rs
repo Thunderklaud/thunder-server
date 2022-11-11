@@ -5,7 +5,7 @@ use serde::Serialize;
 use tracing::{event, Level};
 
 #[derive(Serialize)]
-pub struct DefaultResponse {
+pub struct DefaultStringResponse {
     pub result: Option<String>,
     pub status: bool,
     pub error: String,
@@ -42,7 +42,7 @@ pub fn get_default_insert_response(data_detail: Result<InsertOneResult, Error>) 
 }
 
 pub fn get_empty_success_response() -> HttpResponse {
-    HttpResponse::Ok().json(DefaultResponse {
+    HttpResponse::Ok().json(DefaultStringResponse {
         result: None,
         status: true,
         error: "".parse().unwrap(),

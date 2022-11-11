@@ -62,7 +62,8 @@ async fn main() -> Result<()> {
                     .service(
                         web::scope("/data")
                             .route("/directory", web::post().to(controller::directory::create))
-                            .route("/directory", web::patch().to(controller::directory::update)),
+                            .route("/directory", web::patch().to(controller::directory::update))
+                            .route("/directory", web::get().to(controller::directory::get)),
                     ),
             )
     })

@@ -11,9 +11,27 @@ use serde::Serialize;
 use tracing::{event, Level};
 
 use crate::Claims;
-use crate::controller::utils::{DefaultResponse, get_default_insert_response, get_empty_success_response};
-use crate::model::directory::{Directory, DirectoryPatch, DirectoryPost};
+use crate::controller::utils::{DefaultStringResponse, get_default_insert_response, get_empty_success_response};
+use crate::model::directory::{Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject};
 
+#[derive(Serialize)]
+pub struct DefaultResponse {
+    #[serde(flatten)]
+    result: Option<ResultDataType>,
+    status: bool,
+    error: String,
+}
+
+#[derive(Serialize)]
+enum ResultDataType {
+    #[serde(rename(serialize = "result"))]
+    DirectoryGetResponse(DirectoryGetResponse),
+}
+
+#[derive(Serialize)]
+struct DirectoryGetResponse {
+    dirs: Vec<MinimalDirectoryObject>,
+}
 
 pub async fn create(authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPost>) -> HttpResponse {
     let parent_id = if dir_post_data.parent_id.is_some() && !dir_post_data.parent_id.to_owned().unwrap().is_empty() {
@@ -51,7 +69,7 @@ pub async fn update(authenticated: Authenticated<Claims>, dir_post_data: Json<Di
 
             if update_result.modified_count <= 0 {
                 event!(Level::DEBUG, "renaming directory failed {:?}", update_result);
-                return HttpResponse::InternalServerError().json(DefaultResponse {
+                return HttpResponse::InternalServerError().json(DefaultStringResponse {
                     result: None,
                     status: false,
                     error: "Renaming directory failed".parse().unwrap(),
@@ -60,7 +78,7 @@ pub async fn update(authenticated: Authenticated<Claims>, dir_post_data: Json<Di
         }
     } else {
         event!(Level::DEBUG, "Directory could not be found");
-        return HttpResponse::InternalServerError().json(DefaultResponse {
+        return HttpResponse::InternalServerError().json(DefaultStringResponse {
             result: None,
             status: false,
             error: "Directory could not be found".parse().unwrap(),
@@ -68,4 +86,26 @@ pub async fn update(authenticated: Authenticated<Claims>, dir_post_data: Json<Di
     }
 
     get_empty_success_response()
+}
+
+pub async fn get(authenticated: Authenticated<Claims>, dir_get_data: Json<DirectoryGet>) -> HttpResponse {
+    let mut id = None;
+    if dir_get_data.id.is_some() && !dir_get_data.id.to_owned().unwrap().to_string().eq("") {
+        id = Some(ObjectId::from_str(dir_get_data.id.to_owned().unwrap().as_str()).unwrap());
+    }
+
+    let mut dir_id = None;
+    if id.is_some() {
+        let dir = Directory::get_by_oid(id.unwrap()).await;
+        dir_id = dir.unwrap().id;
+    }
+    let dir_names = Directory::get_all_with_parent_id(dir_id).await;
+
+    HttpResponse::InternalServerError().json(DefaultResponse {
+        result: Some(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
+            dirs: dir_names
+        })),
+        status: true,
+        error: "".parse().unwrap(),
+    })
 }
