@@ -5,11 +5,15 @@ use futures::StreamExt;
 use mongodb::{bson::{extjson::de::Error, oid::ObjectId}, Collection, Cursor, results::InsertOneResult};
 use mongodb::bson::{DateTime, doc};
 use mongodb::results::UpdateResult;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
 use crate::{Claims, database};
 use crate::database::MyDBModel;
+
+static ROOT_DIR_NAME: &str = "/";
+static ROOT_DIR_OID: OnceCell<ObjectId> = OnceCell::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directory {
@@ -51,6 +55,43 @@ pub struct MinimalDirectoryObject {
 }
 
 impl Directory {
+    pub async fn on_start_hook() -> bool {
+        // ensure root directory exists
+        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
+        let dir = col.find_one(
+            doc! {
+                "name": ROOT_DIR_NAME.to_owned()
+            },
+            None,
+        )
+            .await
+            .expect("root directory not found");
+
+        if dir.is_some() {
+            ROOT_DIR_OID.set(dir.unwrap().id.unwrap()).unwrap();
+            event!(Level::INFO, "root directory found {}", ROOT_DIR_OID.get().unwrap());
+            return true;
+        } else {
+            let mut new_dir = Directory {
+                id: None,
+                parent_id: None,
+                name: ROOT_DIR_NAME.to_owned(),
+                creation_date: DateTime::now(),
+                child_ids: vec![],
+                files: vec![],
+            };
+
+            let dir_detail = new_dir.create().await;
+
+            if dir_detail.is_ok() {
+                ROOT_DIR_OID.set(dir_detail.unwrap().inserted_id.as_object_id().unwrap()).unwrap();
+                event!(Level::INFO, "root directory created {}", ROOT_DIR_OID.get().unwrap());
+                return true;
+            }
+        }
+        event!(Level::WARN, "failed creating root directory");
+        false
+    }
     pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
         let dir = col
@@ -121,7 +162,7 @@ impl Directory {
             if dir.is_ok() {
                 dir_names.push(MinimalDirectoryObject {
                     id: dir.to_owned().unwrap().id.unwrap(),
-                    name: dir.to_owned().unwrap().name
+                    name: dir.to_owned().unwrap().name,
                 });
             }
         }

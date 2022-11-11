@@ -4,10 +4,11 @@ use crate::jwt_utils::{
 use actix_jwt_authc::AuthenticateMiddlewareFactory;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
 use tracing::level_filters::LevelFilter;
 use tracing::{event, Level};
+use crate::model::directory::Directory;
 
 mod controller;
 mod database;
@@ -36,6 +37,10 @@ async fn main() -> Result<()> {
 
     // Print out our settings
     println!("{:?}", SETTINGS);
+
+    if !on_start_hook().await {
+        return Err(anyhow!("on_start_hook failed"));
+    };
 
     let jwt_signing_keys = JwtSigningKeys::generate().unwrap();
     let auth_middleware_settings = get_auth_middleware_settings(&jwt_signing_keys);
@@ -72,6 +77,10 @@ async fn main() -> Result<()> {
     .run()
     .await
     .map_err(anyhow::Error::from)
+}
+
+async fn on_start_hook() -> bool {
+    Directory::on_start_hook().await
 }
 
 #[cfg(test)]
