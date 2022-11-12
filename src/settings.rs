@@ -25,6 +25,7 @@ pub struct Settings {
     pub debug: bool,
     pub database: Database,
     pub server: Server,
+    pub jwt_secret: String,
 }
 
 impl Settings {
@@ -32,11 +33,11 @@ impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         event!(Level::INFO, "generate new settings");
 
-        let run_mode = if cfg!(debug_assertions) {
+        let run_mode = String::from(if cfg!(debug_assertions) {
             "development"
         } else {
             "production"
-        };
+        });
 
         let s = Config::builder()
             // Start off by merging in the "default" configuration file
@@ -44,9 +45,10 @@ impl Settings {
             // Add in the current environment file
             // Default to 'development' env
             // Note that this file is _optional_
-            .add_source(File::with_name(&format!("config/{}", run_mode)).required(false))
+            .add_source(File::with_name(format!("config/{}", run_mode).as_str()).required(false))
             // Add in a local configuration file
             // This file shouldn't be checked in to git
+            .add_source(File::with_name("config/local.example").required(false))
             .add_source(File::with_name("config/local").required(false))
             // Add in settings from the environment (with a prefix of APP)
             // Eg.. `APP_DEBUG=1 ./target/app` would set the `debug` key

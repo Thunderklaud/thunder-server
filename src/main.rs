@@ -38,9 +38,13 @@ async fn main() -> Result<()> {
     event!(Level::INFO, "tracing_subscriber initialized in main");
 
     // Print out our settings
-    println!("{:?}", SETTINGS);
+    println!("{:#?}", SETTINGS);
 
-    let jwt_signing_keys = JwtSigningKeys::generate().unwrap();
+    let jwt_signing_keys = if (&settings).jwt_secret.len() > 20 {
+        JwtSigningKeys::parse((&settings).jwt_secret.as_str()).unwrap()
+    } else {
+        JwtSigningKeys::generate().unwrap()
+    };
     let auth_middleware_settings = get_auth_middleware_settings(&jwt_signing_keys);
 
     let (invalidated_jwt_store, stream) = InvalidatedJWTStore::new_with_stream();

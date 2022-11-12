@@ -4,31 +4,43 @@ use actix_jwt_authc::*;
 use dashmap::DashSet;
 use futures::channel::{mpsc, mpsc::Sender};
 use futures::{SinkExt, Stream};
+use hmac::{Hmac, Mac};
 use jsonwebtoken::*;
 use mongodb::bson::oid::ObjectId;
-use ring::rand::SystemRandom;
-use ring::signature::{Ed25519KeyPair, KeyPair};
+use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
+use sha2::Sha512;
 use tokio::sync::Mutex;
 
-pub const JWT_SIGNING_ALGO: Algorithm = Algorithm::EdDSA;
+pub const JWT_SIGNING_ALGO: Algorithm = Algorithm::HS512;
+type HmacSha512 = Hmac<Sha512>;
 
 pub struct JwtSigningKeys {
-    pub encoding_key: EncodingKey,
-    decoding_key: DecodingKey,
+    pub encoding_key: EncodingKey, // encode and sign the jwt on login
+    decoding_key: DecodingKey,     // check if the sign of an existing token is valid
 }
 
 impl JwtSigningKeys {
-    pub fn generate() -> Result<Self, Box<dyn std::error::Error>> {
-        let doc = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
-        let keypair = Ed25519KeyPair::from_pkcs8(doc.as_ref()).unwrap();
-        let encoding_key = EncodingKey::from_ed_der(doc.as_ref());
-        let decoding_key = DecodingKey::from_ed_der(keypair.public_key().as_ref());
+    pub fn parse(secret: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let encoding_key = EncodingKey::from_base64_secret(secret).unwrap();
+        let decoding_key = DecodingKey::from_base64_secret(secret).unwrap();
 
         Ok(JwtSigningKeys {
             encoding_key,
             decoding_key,
         })
+    }
+    pub fn generate() -> Result<Self, Box<dyn std::error::Error>> {
+        let mut randoms: [u8; 64] = [0; 64];
+        let sr = SystemRandom::new();
+        sr.fill(&mut randoms)
+            .expect("failed to create random bytes for the jwt secret");
+
+        let mac = HmacSha512::new_from_slice(&randoms).unwrap().to_owned();
+        let secret = base64::encode(mac.finalize().into_bytes());
+        println!("secret: {}", secret);
+
+        JwtSigningKeys::parse(secret.as_str())
     }
 }
 
