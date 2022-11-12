@@ -5,6 +5,7 @@ use dashmap::DashSet;
 use futures::channel::{mpsc, mpsc::Sender};
 use futures::{SinkExt, Stream};
 use jsonwebtoken::*;
+use mongodb::bson::oid::ObjectId;
 use ring::rand::SystemRandom;
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
@@ -82,6 +83,7 @@ pub struct Claims {
     pub exp: usize,
     pub iat: usize,
     pub sub: String,
+    pub thunder_root_dir_id: ObjectId
 }
 
 pub fn get_auth_middleware_settings(

@@ -10,6 +10,10 @@ use tracing::level_filters::LevelFilter;
 use tracing::{event, Level};
 use crate::model::directory::Directory;
 
+extern crate strum;
+#[macro_use]
+extern crate strum_macros;
+
 mod controller;
 mod database;
 mod jwt_utils;
@@ -37,10 +41,6 @@ async fn main() -> Result<()> {
 
     // Print out our settings
     println!("{:?}", SETTINGS);
-
-    if !on_start_hook().await {
-        return Err(anyhow!("on_start_hook failed"));
-    };
 
     let jwt_signing_keys = JwtSigningKeys::generate().unwrap();
     let auth_middleware_settings = get_auth_middleware_settings(&jwt_signing_keys);
@@ -77,10 +77,6 @@ async fn main() -> Result<()> {
     .run()
     .await
     .map_err(anyhow::Error::from)
-}
-
-async fn on_start_hook() -> bool {
-    Directory::on_start_hook().await
 }
 
 #[cfg(test)]

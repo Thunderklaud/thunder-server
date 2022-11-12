@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::str::FromStr;
 
 use actix_jwt_authc::Authenticated;
@@ -12,7 +13,7 @@ use tracing::{event, Level};
 
 use crate::Claims;
 use crate::controller::utils::{DefaultStringResponse, get_default_insert_response, get_empty_success_response};
-use crate::model::directory::{Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject, ROOT_DIR_OID};
+use crate::model::directory::{Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject};
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
@@ -34,13 +35,23 @@ struct DirectoryGetResponse {
 }
 
 pub async fn create(_authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPost>) -> HttpResponse {
-    let mut parent_id = Some(ROOT_DIR_OID.get().unwrap().to_owned());
+    let user_id = ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap();
+    let mut parent_id = Some(_authenticated.claims.thunder_root_dir_id);
     if dir_post_data.parent_id.is_some() && !dir_post_data.parent_id.to_owned().unwrap().to_string().eq("") {
         parent_id = Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap())
     }
 
+    if !Directory::has_user_permission(parent_id.unwrap(), user_id).await {
+        return HttpResponse::InternalServerError().json(DefaultStringResponse {
+            result: None,
+            status: false,
+            error: "missing parent directory permission".parse().unwrap(),
+        });
+    }
+
     let mut dir = Directory {
         id: None,
+        user_id,
         parent_id,
         name: dir_post_data.name.to_owned().to_string(),
         creation_date: DateTime::now(),
@@ -53,15 +64,25 @@ pub async fn create(_authenticated: Authenticated<Claims>, dir_post_data: Json<D
 }
 
 pub async fn update(_authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPatch>) -> HttpResponse {
-    let dir = Directory::get_by_oid(dir_post_data.id).await;
+    let dir = Directory::get_by_oid(dir_post_data.id, ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap()).await;
 
     if dir.is_some() {
         let mut dir = dir.unwrap();
         if dir_post_data.parent_id.is_some() {      // move dir if parent_id changes
-            if !dir_post_data.parent_id.to_owned().unwrap().to_string().eq("") {
-                dir.move_to(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap()).await;
+            event!(Level::TRACE, "move dir if parent_id changes, parent_id: '{}'", dir_post_data.parent_id.to_owned().unwrap().to_string());
+
+            let move_result = if dir_post_data.parent_id.to_owned().unwrap().to_string().eq("") {
+                dir.move_to(_authenticated.claims.thunder_root_dir_id, _authenticated.borrow()).await
             } else {
-                dir.move_to(ROOT_DIR_OID.get().unwrap().to_owned()).await;
+                dir.move_to(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap(), _authenticated.borrow()).await
+            };
+
+            if move_result.is_err() {
+                return HttpResponse::InternalServerError().json(DefaultStringResponse {
+                    result: None,
+                    status: false,
+                    error: move_result.err().unwrap().to_string(),
+                });
             }
         }
         if dir_post_data.name.is_some() {
@@ -90,12 +111,12 @@ pub async fn update(_authenticated: Authenticated<Claims>, dir_post_data: Json<D
 }
 
 pub async fn get(_authenticated: Authenticated<Claims>, dir_get_data: Json<DirectoryGet>) -> HttpResponse {
-    let mut id = Some(ROOT_DIR_OID.get().unwrap().to_owned());
+    let mut id = Some(_authenticated.claims.thunder_root_dir_id);
     if dir_get_data.id.is_some() && !dir_get_data.id.to_owned().unwrap().to_string().eq("") {
         id = Some(ObjectId::from_str(dir_get_data.id.to_owned().unwrap().as_str()).unwrap());
     }
 
-    let dir = Directory::get_by_oid(id.unwrap()).await;
+    let dir = Directory::get_by_oid(id.unwrap(), ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap()).await;
     if dir.is_some() {
         let dir_names = Directory::get_all_with_parent_id(dir.unwrap().id).await;
 

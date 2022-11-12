@@ -1,5 +1,8 @@
 use std::borrow::Borrow;
 use std::str::FromStr;
+use actix_jwt_authc::Authenticated;
+use anyhow::anyhow;
+use anyhow::Result;
 
 use futures::StreamExt;
 use mongodb::{bson::{extjson::de::Error, oid::ObjectId}, Collection, Cursor, results::InsertOneResult};
@@ -13,13 +16,14 @@ use crate::{Claims, database};
 use crate::database::MyDBModel;
 
 static ROOT_DIR_NAME: &str = "/";
-pub static ROOT_DIR_OID: OnceCell<ObjectId> = OnceCell::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directory {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<ObjectId>,
-    pub parent_id: Option<ObjectId>,    // needs to be option because root dir has no parent_id
+    pub user_id: ObjectId,
+    pub parent_id: Option<ObjectId>,
+    // needs to be option because root dir has no parent_id
     pub name: String,
     pub creation_date: DateTime,
     pub child_ids: Vec<ObjectId>,
@@ -55,25 +59,21 @@ pub struct MinimalDirectoryObject {
 }
 
 impl Directory {
-    pub async fn on_start_hook() -> bool {
-        // ensure root directory exists
+    pub async fn create_user_root_dir(user_id: ObjectId) -> Option<ObjectId> {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
         let dir = col.find_one(
             doc! {
-                "name": ROOT_DIR_NAME.to_owned()
+                "name": ROOT_DIR_NAME.to_owned(),
+                "user_id": user_id
             },
             None,
         )
-            .await
-            .expect("root directory not found");
+            .await;
 
-        if dir.is_some() {
-            ROOT_DIR_OID.set(dir.unwrap().id.unwrap()).unwrap();
-            event!(Level::INFO, "root directory found {}", ROOT_DIR_OID.get().unwrap());
-            return true;
-        } else {
+        if dir.is_err() || (dir.is_ok() && dir.as_ref().unwrap().is_none()) {   // root dir for user does not exist yet
             let mut new_dir = Directory {
                 id: None,
+                user_id,
                 parent_id: None,
                 name: ROOT_DIR_NAME.to_owned(),
                 creation_date: DateTime::now(),
@@ -84,13 +84,13 @@ impl Directory {
             let dir_detail = new_dir.create().await;
 
             if dir_detail.is_ok() {
-                ROOT_DIR_OID.set(dir_detail.unwrap().inserted_id.as_object_id().unwrap()).unwrap();
-                event!(Level::INFO, "root directory created {}", ROOT_DIR_OID.get().unwrap());
-                return true;
+                return dir_detail.unwrap().inserted_id.as_object_id();
             }
+            return None;
         }
-        event!(Level::WARN, "failed creating root directory");
-        false
+
+        // root dir for user already exists
+        return Some(dir.unwrap().unwrap().id.unwrap());
     }
     pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
@@ -102,13 +102,13 @@ impl Directory {
         self.id = dir.inserted_id.as_object_id();
 
         if self.id.is_some() && self.parent_id.is_some() {
-            Directory::add_child_by_oid(self.parent_id.to_owned().unwrap(), self.id.unwrap()).await;
+            Directory::add_child_by_oid(self.parent_id.to_owned().unwrap(), self.id.unwrap(), self.user_id).await;
         }
 
         Ok(dir)
     }
-    async fn add_child_by_oid(parent_oid: ObjectId, child_oid: ObjectId) -> bool {
-        let parent = Directory::get_by_oid(parent_oid).await;
+    async fn add_child_by_oid(parent_oid: ObjectId, child_oid: ObjectId, user_id: ObjectId) -> bool {
+        let parent = Directory::get_by_oid(parent_oid, user_id).await;
         if parent.is_some() {
             let mut parent = parent.unwrap();
             parent.child_ids.push(child_oid);
@@ -119,8 +119,8 @@ impl Directory {
         }
         false
     }
-    async fn remove_child_by_oid(parent_oid: ObjectId, child_oid: ObjectId) -> bool {
-        let parent = Directory::get_by_oid(parent_oid).await;
+    async fn remove_child_by_oid(parent_oid: ObjectId, child_oid: ObjectId, user_id: ObjectId) -> bool {
+        let parent = Directory::get_by_oid(parent_oid, user_id).await;
         if parent.is_some() {
             let mut parent = parent.unwrap();
             let index = parent.child_ids.iter().position(|x| *x == child_oid).unwrap();
@@ -132,10 +132,10 @@ impl Directory {
         }
         false
     }
-    pub async fn get_by_oid_str(oid: &str) -> Option<Directory> {
-        Directory::get_by_oid(ObjectId::from_str(oid).unwrap()).await
+    pub async fn get_by_oid_str(oid: &str, user_id: ObjectId) -> Option<Directory> {
+        Directory::get_by_oid(ObjectId::from_str(oid).unwrap(), user_id).await
     }
-    pub async fn get_by_oid(oid: ObjectId) -> Option<Directory> {
+    pub async fn get_by_oid(oid: ObjectId, user_id: ObjectId) -> Option<Directory> {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
         col.find_one(
             doc! {
@@ -187,14 +187,23 @@ impl Directory {
             .await
             .expect("Error updating directory")
     }
-    pub async fn move_to(&mut self, new_parent_oid: ObjectId) {
+    pub async fn has_user_permission(directory_id: ObjectId, user_id: ObjectId) -> bool {
+        Directory::get_by_oid(directory_id, user_id).await.unwrap().user_id == user_id
+    }
+    pub async fn move_to(&mut self, new_parent_oid: ObjectId, _authenticated: &Authenticated<Claims>) -> Result<()> {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
 
         if self.id.is_some() && self.parent_id.is_some() {
             // do not move if parent_id and new_parent_id are equal or if someone tries to move root
             // todo: does this check really work?
-            if self.parent_id.unwrap() == new_parent_oid || ROOT_DIR_OID.get().unwrap().to_owned() == new_parent_oid {
-                return;
+            if self.parent_id.unwrap() == new_parent_oid {
+                return Err(anyhow!("moving from current parent to current parent is not allowed"));
+            } else if self.id.unwrap() == new_parent_oid {
+                return Err(anyhow!("moving directory into it self is not allowed"));
+            } else if _authenticated.claims.thunder_root_dir_id == self.id.unwrap() {
+                return Err(anyhow!("moving user root directory is not allowed"));
+            } else if !Directory::has_user_permission(new_parent_oid, ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap()).await {
+                return Err(anyhow!("no permission to access the requested parent directory"));
             }
 
             // give dir the new parent id
@@ -213,12 +222,14 @@ impl Directory {
                 .expect("Error giving dir a new parent_id");
 
             // add dir as child id to the new parent
-            Directory::add_child_by_oid(new_parent_oid, self.id.unwrap()).await;
+            Directory::add_child_by_oid(new_parent_oid, self.id.unwrap(), self.user_id).await;
 
             // remove child id from old parent
-            Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap()).await;
+            Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap(), self.user_id).await;
 
             self.parent_id = Some(new_parent_oid);
+            return Ok(());
         }
+        Err(anyhow!("no permission or directory does not exist"))
     }
 }

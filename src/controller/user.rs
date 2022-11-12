@@ -10,8 +10,8 @@ use time::OffsetDateTime;
 use tracing::{event, Level};
 
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
-use crate::model::user::{Role, User, UserLogin};
-use crate::{Claims, InvalidatedJWTStore};
+use crate::model::user::{Role, User, UserLogin, UserRegister};
+use crate::{Claims, Directory, InvalidatedJWTStore};
 use crate::controller::utils::get_default_insert_response;
 
 #[derive(Serialize)]
@@ -51,12 +51,13 @@ pub async fn login(
 
     let user = User::get_by_email(login_user.email.to_owned().as_str()).await;
     if user.is_some() {
-        let sub = user.unwrap().id.unwrap().to_string();
+        let sub = user.as_ref().unwrap().id.unwrap().to_string();
+        let thunder_root_dir_id = user.as_ref().unwrap().root_dir_id.unwrap();
         let iat = OffsetDateTime::now_utc().unix_timestamp() as usize;
         let expires_at = OffsetDateTime::now_utc().add(jwt_ttl.0);
         let exp = expires_at.unix_timestamp() as usize;
 
-        let jwt_claims = Claims { iat, exp, sub };
+        let jwt_claims = Claims { iat, exp, sub, thunder_root_dir_id };
         let jwt_token = encode(
             &Header::new(JWT_SIGNING_ALGO),
             &jwt_claims,
@@ -108,7 +109,7 @@ pub async fn logout(
     })
 }
 
-pub async fn register(new_user: Json<User>) -> HttpResponse {
+pub async fn register(new_user: Json<UserRegister>) -> HttpResponse {
     if User::exists(&new_user.email).await {
         return HttpResponse::InternalServerError().json(DefaultResponse {
             result: None,
@@ -123,8 +124,21 @@ pub async fn register(new_user: Json<User>) -> HttpResponse {
         lastname: new_user.lastname.to_owned(),
         email: new_user.email.to_owned(),
         pw_hash: new_user.pw_hash.to_owned(),
-        role: Some(Role::BaseUser),
+        role: Role::BaseUser,
+        root_dir_id: None
     };
     let user_detail = data.create().await;
+
+    if user_detail.is_ok() {
+        let root_dir_id = Directory::create_user_root_dir(user_detail.as_ref().unwrap().inserted_id.as_object_id().unwrap()).await;
+        if root_dir_id.is_none() {
+            // creating root dir failed
+            // revert work: remove user and return error
+        }
+
+        data.root_dir_id = root_dir_id;
+        data.update().await;
+    }
+
     get_default_insert_response(user_detail)
 }
