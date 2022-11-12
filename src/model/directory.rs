@@ -131,14 +131,12 @@ impl Directory {
         }
         false
     }
-    pub async fn get_by_oid_str(oid: &str, user_id: ObjectId) -> Option<Directory> {
-        Directory::get_by_oid(ObjectId::from_str(oid).unwrap(), user_id).await
-    }
     pub async fn get_by_oid(oid: ObjectId, user_id: ObjectId) -> Option<Directory> {
         let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
         col.find_one(
             doc! {
-                "_id": oid
+                "_id": oid,
+                "user_id": user_id
             },
             None,
         )
