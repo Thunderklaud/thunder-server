@@ -4,7 +4,6 @@ use actix_jwt_authc::Authenticated;
 use actix_web::web::Data;
 use actix_web::{web::Json, HttpResponse};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};

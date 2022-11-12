@@ -4,10 +4,7 @@ use std::str::FromStr;
 use actix_jwt_authc::Authenticated;
 use actix_web::{HttpResponse, web::Json};
 use mongodb::bson::DateTime;
-use mongodb::bson::datetime::DateTimeBuilder;
-use mongodb::bson::extjson::de::Error;
 use mongodb::bson::oid::ObjectId;
-use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use tracing::{event, Level};
 
