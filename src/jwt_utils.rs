@@ -6,6 +6,7 @@ use futures::channel::{mpsc, mpsc::Sender};
 use futures::{SinkExt, Stream};
 use hmac::{Hmac, Mac};
 use jsonwebtoken::*;
+use mongodb::bson::oid::ObjectId;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
@@ -94,6 +95,7 @@ pub struct Claims {
     pub exp: usize,
     pub iat: usize,
     pub sub: String,
+    pub thunder_root_dir_id: ObjectId,
 }
 
 pub fn get_auth_middleware_settings(
