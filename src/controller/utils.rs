@@ -1,6 +1,6 @@
 use actix_web::HttpResponse;
-use mongodb::results::InsertOneResult;
 use mongodb::bson::extjson::de::Error;
+use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use tracing::{event, Level};
 

@@ -2,15 +2,19 @@ use std::borrow::Borrow;
 use std::str::FromStr;
 
 use actix_jwt_authc::Authenticated;
-use actix_web::{HttpResponse, web::Json};
-use mongodb::bson::DateTime;
+use actix_web::{web::Json, HttpResponse};
 use mongodb::bson::oid::ObjectId;
+use mongodb::bson::DateTime;
 use serde::Serialize;
 use tracing::{event, Level};
 
+use crate::controller::utils::{
+    get_default_insert_response, get_empty_success_response, DefaultStringResponse,
+};
+use crate::model::directory::{
+    Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
+};
 use crate::Claims;
-use crate::controller::utils::{DefaultStringResponse, get_default_insert_response, get_empty_success_response};
-use crate::model::directory::{Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject};
 
 #[derive(Serialize)]
 pub struct DefaultResponse {
@@ -31,11 +35,22 @@ struct DirectoryGetResponse {
     dirs: Vec<MinimalDirectoryObject>,
 }
 
-pub async fn create(_authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPost>) -> HttpResponse {
+pub async fn create(
+    _authenticated: Authenticated<Claims>,
+    dir_post_data: Json<DirectoryPost>,
+) -> HttpResponse {
     let user_id = ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap();
     let mut parent_id = Some(_authenticated.claims.thunder_root_dir_id);
-    if dir_post_data.parent_id.is_some() && !dir_post_data.parent_id.to_owned().unwrap().to_string().eq("") {
-        parent_id = Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap())
+    if dir_post_data.parent_id.is_some()
+        && !dir_post_data
+            .parent_id
+            .to_owned()
+            .unwrap()
+            .to_string()
+            .eq("")
+    {
+        parent_id =
+            Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap())
     }
 
     if !Directory::has_user_permission(parent_id.unwrap(), user_id).await {
@@ -60,18 +75,45 @@ pub async fn create(_authenticated: Authenticated<Claims>, dir_post_data: Json<D
     get_default_insert_response(dir_detail)
 }
 
-pub async fn update(_authenticated: Authenticated<Claims>, dir_post_data: Json<DirectoryPatch>) -> HttpResponse {
-    let dir = Directory::get_by_oid(dir_post_data.id, ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap()).await;
+pub async fn update(
+    _authenticated: Authenticated<Claims>,
+    dir_post_data: Json<DirectoryPatch>,
+) -> HttpResponse {
+    let dir = Directory::get_by_oid(
+        dir_post_data.id,
+        ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
+    )
+    .await;
 
     if dir.is_some() {
         let mut dir = dir.unwrap();
-        if dir_post_data.parent_id.is_some() {      // move dir if parent_id changes
-            event!(Level::TRACE, "move dir if parent_id changes, parent_id: '{}'", dir_post_data.parent_id.to_owned().unwrap().to_string());
+        if dir_post_data.parent_id.is_some() {
+            // move dir if parent_id changes
+            event!(
+                Level::TRACE,
+                "move dir if parent_id changes, parent_id: '{}'",
+                dir_post_data.parent_id.to_owned().unwrap().to_string()
+            );
 
-            let move_result = if dir_post_data.parent_id.to_owned().unwrap().to_string().eq("") {
-                dir.move_to(_authenticated.claims.thunder_root_dir_id, _authenticated.borrow()).await
+            let move_result = if dir_post_data
+                .parent_id
+                .to_owned()
+                .unwrap()
+                .to_string()
+                .eq("")
+            {
+                dir.move_to(
+                    _authenticated.claims.thunder_root_dir_id,
+                    _authenticated.borrow(),
+                )
+                .await
             } else {
-                dir.move_to(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap(), _authenticated.borrow()).await
+                dir.move_to(
+                    ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str())
+                        .unwrap(),
+                    _authenticated.borrow(),
+                )
+                .await
             };
 
             if move_result.is_err() {
@@ -87,7 +129,11 @@ pub async fn update(_authenticated: Authenticated<Claims>, dir_post_data: Json<D
             let update_result = dir.update().await;
 
             if update_result.modified_count <= 0 {
-                event!(Level::DEBUG, "renaming directory failed {:?}", update_result);
+                event!(
+                    Level::DEBUG,
+                    "renaming directory failed {:?}",
+                    update_result
+                );
                 return HttpResponse::InternalServerError().json(DefaultStringResponse {
                     result: None,
                     status: false,
@@ -107,19 +153,26 @@ pub async fn update(_authenticated: Authenticated<Claims>, dir_post_data: Json<D
     get_empty_success_response()
 }
 
-pub async fn get(_authenticated: Authenticated<Claims>, dir_get_data: Json<DirectoryGet>) -> HttpResponse {
+pub async fn get(
+    _authenticated: Authenticated<Claims>,
+    dir_get_data: Json<DirectoryGet>,
+) -> HttpResponse {
     let mut id = Some(_authenticated.claims.thunder_root_dir_id);
     if dir_get_data.id.is_some() && !dir_get_data.id.to_owned().unwrap().to_string().eq("") {
         id = Some(ObjectId::from_str(dir_get_data.id.to_owned().unwrap().as_str()).unwrap());
     }
 
-    let dir = Directory::get_by_oid(id.unwrap(), ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap()).await;
+    let dir = Directory::get_by_oid(
+        id.unwrap(),
+        ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
+    )
+    .await;
     if dir.is_some() {
         let dir_names = Directory::get_all_with_parent_id(dir.unwrap().id).await;
 
         return HttpResponse::Ok().json(DefaultResponse {
             result: Some(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
-                dirs: dir_names
+                dirs: dir_names,
             })),
             status: true,
             error: "".parse().unwrap(),

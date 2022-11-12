@@ -2,18 +2,18 @@ use std::borrow::Borrow;
 use std::str::FromStr;
 
 use actix_jwt_authc::Authenticated;
-use mongodb::{
-    bson::{extjson::de::Error, oid::ObjectId},
-    Collection,
-    results::InsertOneResult,
-};
 use mongodb::bson::doc;
 use mongodb::results::UpdateResult;
+use mongodb::{
+    bson::{extjson::de::Error, oid::ObjectId},
+    results::InsertOneResult,
+    Collection,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use crate::{Claims, database};
 use crate::database::MyDBModel;
+use crate::{database, Claims};
 
 use strum_macros::AsRefStr;
 
@@ -80,8 +80,8 @@ impl User {
             },
             None,
         )
-            .await
-            .expect("User not found")
+        .await
+        .expect("User not found")
     }
 
     pub async fn get_by_email(email: &str) -> Option<User> {
@@ -92,8 +92,8 @@ impl User {
             },
             None,
         )
-            .await
-            .expect("User not found")
+        .await
+        .expect("User not found")
     }
 
     pub async fn exists(email: &String) -> bool {
@@ -120,7 +120,7 @@ impl User {
             },
             None,
         )
-            .await
-            .expect("Error updating user")
+        .await
+        .expect("Error updating user")
     }
 }

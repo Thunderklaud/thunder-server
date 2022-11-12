@@ -1,18 +1,22 @@
-use std::borrow::Borrow;
-use std::str::FromStr;
 use actix_jwt_authc::Authenticated;
 use anyhow::anyhow;
 use anyhow::Result;
+use std::borrow::Borrow;
+use std::str::FromStr;
 
 use futures::StreamExt;
-use mongodb::{bson::{extjson::de::Error, oid::ObjectId}, Collection, results::InsertOneResult};
-use mongodb::bson::{DateTime, doc};
+use mongodb::bson::{doc, DateTime};
 use mongodb::results::UpdateResult;
+use mongodb::{
+    bson::{extjson::de::Error, oid::ObjectId},
+    results::InsertOneResult,
+    Collection,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use crate::{Claims, database};
 use crate::database::MyDBModel;
+use crate::{database, Claims};
 
 static ROOT_DIR_NAME: &str = "/";
 
@@ -43,7 +47,7 @@ pub struct DirectoryPatch {
     // the document id of the directory that should be updated
     pub name: Option<String>,
     // null or the new name
-    pub parent_id: Option<String>,      // null or the new parent directory document id
+    pub parent_id: Option<String>, // null or the new parent directory document id
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,17 +63,21 @@ pub struct MinimalDirectoryObject {
 
 impl Directory {
     pub async fn create_user_root_dir(user_id: ObjectId) -> Option<ObjectId> {
-        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
-        let dir = col.find_one(
-            doc! {
-                "name": ROOT_DIR_NAME.to_owned(),
-                "user_id": user_id
-            },
-            None,
-        )
+        let col: Collection<Directory> = database::get_collection("Directory")
+            .await
+            .clone_with_type();
+        let dir = col
+            .find_one(
+                doc! {
+                    "name": ROOT_DIR_NAME.to_owned(),
+                    "user_id": user_id
+                },
+                None,
+            )
             .await;
 
-        if dir.is_err() || (dir.is_ok() && dir.as_ref().unwrap().is_none()) {   // root dir for user does not exist yet
+        if dir.is_err() || (dir.is_ok() && dir.as_ref().unwrap().is_none()) {
+            // root dir for user does not exist yet
             let mut new_dir = Directory {
                 id: None,
                 user_id,
@@ -92,7 +100,9 @@ impl Directory {
         return Some(dir.unwrap().unwrap().id.unwrap());
     }
     pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
-        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
+        let col: Collection<Directory> = database::get_collection("Directory")
+            .await
+            .clone_with_type();
         let dir = col
             .insert_one(self.borrow(), None)
             .await
@@ -101,12 +111,21 @@ impl Directory {
         self.id = dir.inserted_id.as_object_id();
 
         if self.id.is_some() && self.parent_id.is_some() {
-            Directory::add_child_by_oid(self.parent_id.to_owned().unwrap(), self.id.unwrap(), self.user_id).await;
+            Directory::add_child_by_oid(
+                self.parent_id.to_owned().unwrap(),
+                self.id.unwrap(),
+                self.user_id,
+            )
+            .await;
         }
 
         Ok(dir)
     }
-    async fn add_child_by_oid(parent_oid: ObjectId, child_oid: ObjectId, user_id: ObjectId) -> bool {
+    async fn add_child_by_oid(
+        parent_oid: ObjectId,
+        child_oid: ObjectId,
+        user_id: ObjectId,
+    ) -> bool {
         let parent = Directory::get_by_oid(parent_oid, user_id).await;
         if parent.is_some() {
             let mut parent = parent.unwrap();
@@ -114,25 +133,43 @@ impl Directory {
             if parent.update().await.modified_count > 0 {
                 return true;
             }
-            event!(Level::INFO, "error adding child to directory {}?", parent.id.unwrap());
+            event!(
+                Level::INFO,
+                "error adding child to directory {}?",
+                parent.id.unwrap()
+            );
         }
         false
     }
-    async fn remove_child_by_oid(parent_oid: ObjectId, child_oid: ObjectId, user_id: ObjectId) -> bool {
+    async fn remove_child_by_oid(
+        parent_oid: ObjectId,
+        child_oid: ObjectId,
+        user_id: ObjectId,
+    ) -> bool {
         let parent = Directory::get_by_oid(parent_oid, user_id).await;
         if parent.is_some() {
             let mut parent = parent.unwrap();
-            let index = parent.child_ids.iter().position(|x| *x == child_oid).unwrap();
+            let index = parent
+                .child_ids
+                .iter()
+                .position(|x| *x == child_oid)
+                .unwrap();
             parent.child_ids.remove(index);
             if parent.update().await.modified_count > 0 {
                 return true;
             }
-            event!(Level::INFO, "error removing child from directory {}?", parent.id.unwrap());
+            event!(
+                Level::INFO,
+                "error removing child from directory {}?",
+                parent.id.unwrap()
+            );
         }
         false
     }
     pub async fn get_by_oid(oid: ObjectId, user_id: ObjectId) -> Option<Directory> {
-        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
+        let col: Collection<Directory> = database::get_collection("Directory")
+            .await
+            .clone_with_type();
         col.find_one(
             doc! {
                 "_id": oid,
@@ -140,17 +177,22 @@ impl Directory {
             },
             None,
         )
-            .await
-            .expect("Directory not found")
+        .await
+        .expect("Directory not found")
     }
-    pub async fn get_all_with_parent_id(parent_id: Option<ObjectId>) -> Vec<MinimalDirectoryObject> {
-        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
-        let mut cursor = col.find(
-            doc! {
-                "parent_id": parent_id
-            },
-            None,
-        )
+    pub async fn get_all_with_parent_id(
+        parent_id: Option<ObjectId>,
+    ) -> Vec<MinimalDirectoryObject> {
+        let col: Collection<Directory> = database::get_collection("Directory")
+            .await
+            .clone_with_type();
+        let mut cursor = col
+            .find(
+                doc! {
+                    "parent_id": parent_id
+                },
+                None,
+            )
             .await
             .expect("Directories by parent_id not found");
 
@@ -166,7 +208,9 @@ impl Directory {
         dir_names
     }
     pub async fn update(&mut self) -> UpdateResult {
-        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
+        let col: Collection<Directory> = database::get_collection("Directory")
+            .await
+            .clone_with_type();
         col.update_one(
             doc! {
                 "_id": self.id.unwrap()
@@ -181,48 +225,68 @@ impl Directory {
             },
             None,
         )
-            .await
-            .expect("Error updating directory")
+        .await
+        .expect("Error updating directory")
     }
     pub async fn has_user_permission(directory_id: ObjectId, user_id: ObjectId) -> bool {
-        Directory::get_by_oid(directory_id, user_id).await.unwrap().user_id == user_id
+        Directory::get_by_oid(directory_id, user_id)
+            .await
+            .unwrap()
+            .user_id
+            == user_id
     }
-    pub async fn move_to(&mut self, new_parent_oid: ObjectId, _authenticated: &Authenticated<Claims>) -> Result<()> {
-        let col: Collection<Directory> = database::get_collection("Directory").await.clone_with_type();
+    pub async fn move_to(
+        &mut self,
+        new_parent_oid: ObjectId,
+        _authenticated: &Authenticated<Claims>,
+    ) -> Result<()> {
+        let col: Collection<Directory> = database::get_collection("Directory")
+            .await
+            .clone_with_type();
 
         if self.id.is_some() && self.parent_id.is_some() {
             // do not move if parent_id and new_parent_id are equal or if someone tries to move root
             // todo: does this check really work?
             if self.parent_id.unwrap() == new_parent_oid {
-                return Err(anyhow!("moving from current parent to current parent is not allowed"));
+                return Err(anyhow!(
+                    "moving from current parent to current parent is not allowed"
+                ));
             } else if self.id.unwrap() == new_parent_oid {
                 return Err(anyhow!("moving directory into it self is not allowed"));
             } else if _authenticated.claims.thunder_root_dir_id == self.id.unwrap() {
                 return Err(anyhow!("moving user root directory is not allowed"));
-            } else if !Directory::has_user_permission(new_parent_oid, ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap()).await {
-                return Err(anyhow!("no permission to access the requested parent directory"));
+            } else if !Directory::has_user_permission(
+                new_parent_oid,
+                ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
+            )
+            .await
+            {
+                return Err(anyhow!(
+                    "no permission to access the requested parent directory"
+                ));
             }
 
             // give dir the new parent id
             col.update_one(
                 doc! {
-                "_id": self.id.unwrap()
-            },
+                    "_id": self.id.unwrap()
+                },
                 doc! {
-                "$set": {
-                    "parent_id": new_parent_oid
-                }
-            },
+                    "$set": {
+                        "parent_id": new_parent_oid
+                    }
+                },
                 None,
             )
-                .await
-                .expect("Error giving dir a new parent_id");
+            .await
+            .expect("Error giving dir a new parent_id");
 
             // add dir as child id to the new parent
             Directory::add_child_by_oid(new_parent_oid, self.id.unwrap(), self.user_id).await;
 
             // remove child id from old parent
-            Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap(), self.user_id).await;
+            Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap(), self.user_id)
+                .await;
 
             self.parent_id = Some(new_parent_oid);
             return Ok(());
