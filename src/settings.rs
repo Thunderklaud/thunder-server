@@ -25,6 +25,7 @@ pub struct Settings {
     pub debug: bool,
     pub database: Database,
     pub server: Server,
+    pub jwt_secret: String,
 }
 
 impl Settings {
