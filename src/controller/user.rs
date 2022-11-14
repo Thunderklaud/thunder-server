@@ -4,6 +4,7 @@ use actix_jwt_authc::Authenticated;
 use actix_web::web::Data;
 use actix_web::{web::Json, HttpResponse};
 use jsonwebtoken::{encode, EncodingKey, Header};
+use ring::test::from_hex;
 use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};
@@ -117,6 +118,23 @@ pub async fn logout(
 }
 
 pub async fn register(new_user: Json<UserRegister>) -> HttpResponse {
+    let pw_bytes_res = from_hex(new_user.pw_hash.to_owned().as_str());
+
+    // sha256 requires 32 bytes = 256 bit
+    // sha512 requires 64 bytes = 512 bit
+    if pw_bytes_res.is_err()
+        || (pw_bytes_res.is_ok() && pw_bytes_res.to_owned().unwrap().len() < 32)
+    {
+        // not a hex encoded hash or less than 256 bit size
+        return HttpResponse::InternalServerError().json(DefaultResponse {
+            result: None,
+            status: false,
+            error: "Please provide at least a hex encoded sha256 hash"
+                .parse()
+                .unwrap(),
+        });
+    }
+
     if User::exists(&new_user.email).await {
         return HttpResponse::InternalServerError().json(DefaultResponse {
             result: None,
