@@ -133,3 +133,21 @@ impl User {
         pw_bytes_res.is_ok() && pw_bytes_res.to_owned().unwrap().len() >= 32
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_hash_design() {
+        let trash = "asdf1234567xx";
+        let sha1 = "4fcdced7b0bdb6d4861c458c74bf0b8ace258c5d";
+        let sha256 = "1bc464c87c470882de2453b9978c4fa61dd680c30617b68c5ac1d4052ed39aef";
+        let sha512 = "12320d5e2a6c4f869f9dcca6fce9f36a9e51d8e324538adfbd0631f18011a2bbbcb5824150de3b1704d7b38a164eab368dcb1c396e0fe3febc5dc1e792e46660";
+
+        assert_eq!(User::is_valid_hash_design(trash), false);
+        assert_eq!(User::is_valid_hash_design(sha1), false);
+        assert_eq!(User::is_valid_hash_design(sha256), true);
+        assert_eq!(User::is_valid_hash_design(sha512), true);
+    }
+}
