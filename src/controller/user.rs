@@ -117,6 +117,17 @@ pub async fn logout(
 }
 
 pub async fn register(new_user: Json<UserRegister>) -> HttpResponse {
+    if !User::is_valid_hash_design(new_user.pw_hash.to_owned().as_str()) {
+        // not a hex encoded hash or less than 256 bit size
+        return HttpResponse::InternalServerError().json(DefaultResponse {
+            result: None,
+            status: false,
+            error: "Please provide at least a hex encoded sha256 hash"
+                .parse()
+                .unwrap(),
+        });
+    }
+
     if User::exists(&new_user.email).await {
         return HttpResponse::InternalServerError().json(DefaultResponse {
             result: None,
