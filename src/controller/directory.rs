@@ -156,32 +156,27 @@ pub async fn update(
 pub async fn get(
     _authenticated: Authenticated<Claims>,
     dir_get_data: Json<DirectoryGet>,
-) -> HttpResponse {
-    let mut id = Some(_authenticated.claims.thunder_root_dir_id);
-    if dir_get_data.id.is_some() && !dir_get_data.id.to_owned().unwrap().to_string().eq("") {
-        id = Some(ObjectId::from_str(dir_get_data.id.to_owned().unwrap().as_str()).unwrap());
-    }
+) -> actix_web::Result<HttpResponse> {
+    let id = match &dir_get_data.id {
+        Some(id) if !id.is_empty() => {
+            ObjectId::from_str(id).map_err(|e| actix_web::error::ErrorBadRequest(e))?
+        }
+        _ => _authenticated.claims.thunder_root_dir_id,
+    };
 
     let dir = Directory::get_by_oid(
-        id.unwrap(),
+        id,
         ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
     )
     .await;
-    if dir.is_some() {
-        let dir_names = Directory::get_all_with_parent_id(dir.unwrap().id).await;
 
-        return HttpResponse::Ok().json(DefaultResponse {
-            result: Some(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
-                dirs: dir_names,
-            })),
-            status: true,
-            error: "".parse().unwrap(),
-        });
-    }
+    let dir = dir.ok_or_else(|| {
+        actix_web::error::ErrorInternalServerError("Could not get requested directory")
+    })?;
 
-    HttpResponse::InternalServerError().json(DefaultResponse {
-        result: None,
-        status: true,
-        error: "Could not get requested directory".parse().unwrap(),
-    })
+    Ok(
+        HttpResponse::Ok().json(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
+            dirs: Directory::get_all_with_parent_id(dir.id).await,
+        })),
+    )
 }
