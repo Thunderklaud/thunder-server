@@ -1,5 +1,8 @@
+use std::str::FromStr;
+
 use actix_web::HttpResponse;
 use mongodb::bson::extjson::de::Error;
+use mongodb::bson::oid::ObjectId;
 use mongodb::results::InsertOneResult;
 use serde::Serialize;
 use tracing::{event, Level};
@@ -46,5 +49,17 @@ pub fn get_empty_success_response() -> HttpResponse {
         result: None,
         status: true,
         error: "".parse().unwrap(),
+    })
+}
+
+pub fn extract_object_id(
+    id: &Option<String>,
+    default_if_none: ObjectId,
+) -> actix_web::Result<ObjectId> {
+    Ok(match id {
+        Some(parent_id) if !parent_id.is_empty() => {
+            ObjectId::from_str(parent_id).map_err(|e| actix_web::error::ErrorBadRequest(e))?
+        }
+        _ => default_if_none,
     })
 }

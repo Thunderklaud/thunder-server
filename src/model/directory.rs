@@ -1,21 +1,17 @@
 use actix_jwt_authc::Authenticated;
-use anyhow::anyhow;
 use anyhow::Result;
+use anyhow::{anyhow, bail};
 use std::borrow::Borrow;
-use std::str::FromStr;
 
 use futures::StreamExt;
 use mongodb::bson::{doc, DateTime};
 use mongodb::results::UpdateResult;
-use mongodb::{
-    bson::{extjson::de::Error, oid::ObjectId},
-    results::InsertOneResult,
-    Collection,
-};
+use mongodb::{bson::oid::ObjectId, results::InsertOneResult, Collection};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
 use crate::database::MyDBModel;
+use crate::jwt_utils::extract_user_oid;
 use crate::{database, Claims};
 
 static ROOT_DIR_NAME: &str = "/";
@@ -99,14 +95,11 @@ impl Directory {
         // root dir for user already exists
         return Some(dir.unwrap().unwrap().id.unwrap());
     }
-    pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
+    pub async fn create(&mut self) -> Result<InsertOneResult> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
-        let dir = col
-            .insert_one(self.borrow(), None)
-            .await
-            .expect("Error creating directory");
+        let dir = col.insert_one(self.borrow(), None).await?;
 
         self.id = dir.inserted_id.as_object_id();
 
@@ -228,12 +221,14 @@ impl Directory {
         .await
         .expect("Error updating directory")
     }
-    pub async fn has_user_permission(directory_id: ObjectId, user_id: ObjectId) -> bool {
-        Directory::get_by_oid(directory_id, user_id)
-            .await
-            .unwrap()
-            .user_id
-            == user_id
+    pub async fn has_user_permission(
+        directory_id: ObjectId,
+        user_id: ObjectId,
+    ) -> actix_web::Result<()> {
+        match Directory::get_by_oid(directory_id, user_id).await {
+            Some(dir) if dir.user_id == user_id => Ok(()),
+            _ => Err(actix_web::error::ErrorForbidden("missing permission")),
+        }
     }
     pub async fn move_to(
         &mut self,
@@ -248,23 +243,16 @@ impl Directory {
             // do not move if parent_id and new_parent_id are equal or if someone tries to move root
             // todo: does this check really work?
             if self.parent_id.unwrap() == new_parent_oid {
-                return Err(anyhow!(
-                    "moving from current parent to current parent is not allowed"
-                ));
+                bail!("moving from current parent to current parent is not allowed");
             } else if self.id.unwrap() == new_parent_oid {
-                return Err(anyhow!("moving directory into it self is not allowed"));
+                bail!("moving directory into it self is not allowed");
             } else if _authenticated.claims.thunder_root_dir_id == self.id.unwrap() {
-                return Err(anyhow!("moving user root directory is not allowed"));
-            } else if !Directory::has_user_permission(
-                new_parent_oid,
-                ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
-            )
-            .await
-            {
-                return Err(anyhow!(
-                    "no permission to access the requested parent directory"
-                ));
+                bail!("moving user root directory is not allowed");
             }
+
+            Directory::has_user_permission(new_parent_oid, extract_user_oid(_authenticated))
+                .await
+                .map_err(|_| anyhow!("no permission to access the requested parent directory"))?;
 
             // give dir the new parent id
             col.update_one(
@@ -291,6 +279,6 @@ impl Directory {
             self.parent_id = Some(new_parent_oid);
             return Ok(());
         }
-        Err(anyhow!("no permission or directory does not exist"))
+        bail!("no permission or directory does not exist")
     }
 }

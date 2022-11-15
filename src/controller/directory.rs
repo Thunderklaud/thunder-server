@@ -9,8 +9,9 @@ use serde::Serialize;
 use tracing::{event, Level};
 
 use crate::controller::utils::{
-    get_default_insert_response, get_empty_success_response, DefaultStringResponse,
+    extract_object_id, get_empty_success_response, DefaultStringResponse,
 };
+use crate::jwt_utils::extract_user_oid;
 use crate::model::directory::{
     Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
 };
@@ -38,52 +39,37 @@ struct DirectoryGetResponse {
 pub async fn create(
     _authenticated: Authenticated<Claims>,
     dir_post_data: Json<DirectoryPost>,
-) -> HttpResponse {
-    let user_id = ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap();
-    let mut parent_id = Some(_authenticated.claims.thunder_root_dir_id);
-    if dir_post_data.parent_id.is_some()
-        && !dir_post_data
-            .parent_id
-            .to_owned()
-            .unwrap()
-            .to_string()
-            .eq("")
-    {
-        parent_id =
-            Some(ObjectId::from_str(dir_post_data.parent_id.to_owned().unwrap().as_str()).unwrap())
-    }
+) -> actix_web::Result<HttpResponse> {
+    let user_id = extract_user_oid(&_authenticated);
+    let parent_id = extract_object_id(
+        &dir_post_data.parent_id,
+        _authenticated.claims.thunder_root_dir_id,
+    )?;
 
-    if !Directory::has_user_permission(parent_id.unwrap(), user_id).await {
-        return HttpResponse::InternalServerError().json(DefaultStringResponse {
-            result: None,
-            status: false,
-            error: "missing parent directory permission".parse().unwrap(),
-        });
-    }
+    Directory::has_user_permission(parent_id, user_id).await?;
 
     let mut dir = Directory {
         id: None,
         user_id,
-        parent_id,
+        parent_id: Some(parent_id),
         name: dir_post_data.name.to_owned().to_string(),
         creation_date: DateTime::now(),
         child_ids: vec![],
         files: vec![],
     };
 
-    let dir_detail = dir.create().await;
-    get_default_insert_response(dir_detail)
+    let dir_detail = dir
+        .create()
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    Ok(HttpResponse::Ok().json(dir_detail))
 }
 
 pub async fn update(
     _authenticated: Authenticated<Claims>,
     dir_post_data: Json<DirectoryPatch>,
 ) -> HttpResponse {
-    let dir = Directory::get_by_oid(
-        dir_post_data.id,
-        ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
-    )
-    .await;
+    let dir = Directory::get_by_oid(dir_post_data.id, extract_user_oid(&_authenticated)).await;
 
     if dir.is_some() {
         let mut dir = dir.unwrap();
@@ -164,11 +150,7 @@ pub async fn get(
         _ => _authenticated.claims.thunder_root_dir_id,
     };
 
-    let dir = Directory::get_by_oid(
-        id,
-        ObjectId::from_str(_authenticated.claims.sub.as_str()).unwrap(),
-    )
-    .await;
+    let dir = Directory::get_by_oid(id, extract_user_oid(&_authenticated)).await;
 
     let dir = dir.ok_or_else(|| {
         actix_web::error::ErrorInternalServerError("Could not get requested directory")

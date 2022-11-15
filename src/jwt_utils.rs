@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
 use actix_jwt_authc::*;
@@ -85,6 +86,11 @@ impl InvalidatedJWTStore {
 
 pub fn get_jwt_ttl() -> JWTTtl {
     JWTTtl(time::Duration::hours(1))
+}
+
+pub fn extract_user_oid(authenticated: &Authenticated<Claims>) -> ObjectId {
+    ObjectId::from_str(authenticated.claims.sub.as_str())
+        .expect("could not extract user id from authenticated")
 }
 
 #[derive(Clone, Copy)]
