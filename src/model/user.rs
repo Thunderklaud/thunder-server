@@ -9,6 +9,7 @@ use mongodb::{
     results::InsertOneResult,
     Collection,
 };
+use ring::test::from_hex;
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
@@ -122,5 +123,13 @@ impl User {
         )
         .await
         .expect("Error updating user")
+    }
+
+    pub fn is_valid_hash_design(hash: &str) -> bool {
+        let pw_bytes_res = from_hex(hash);
+
+        // sha256 requires 32 bytes = 256 bit
+        // sha512 requires 64 bytes = 512 bit
+        pw_bytes_res.is_ok() && pw_bytes_res.to_owned().unwrap().len() >= 32
     }
 }
