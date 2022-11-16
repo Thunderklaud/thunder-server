@@ -8,7 +8,6 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};
 
-use crate::controller::utils::get_default_insert_response;
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
 use crate::model::user::{Role, User, UserLogin, UserRegister};
 use crate::{Claims, Directory, InvalidatedJWTStore};
@@ -23,8 +22,6 @@ pub struct DefaultResponse {
 
 #[derive(Serialize)]
 enum ResultDataType {
-    #[serde(rename(serialize = "result"))]
-    LoginResponse(LoginResponse),
     #[serde(rename(serialize = "result"))]
     TestResponse(TestResponse),
 }

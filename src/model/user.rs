@@ -4,11 +4,7 @@ use std::str::FromStr;
 use actix_jwt_authc::Authenticated;
 use mongodb::bson::doc;
 use mongodb::results::UpdateResult;
-use mongodb::{
-    bson::{extjson::de::Error, oid::ObjectId},
-    results::InsertOneResult,
-    Collection,
-};
+use mongodb::{bson::oid::ObjectId, results::InsertOneResult, Collection};
 use ring::test::from_hex;
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};

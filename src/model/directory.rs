@@ -1,8 +1,6 @@
 use std::borrow::Borrow;
 
 use actix_jwt_authc::Authenticated;
-use anyhow::Result;
-use anyhow::{anyhow, bail};
 use futures::StreamExt;
 use mongodb::bson::{doc, DateTime};
 use mongodb::results::UpdateResult;
@@ -65,7 +63,7 @@ impl Directory {
         let dir = col
             .find_one(
                 doc! {
-                    "name": ROOT_DIR_NAME.to_owned(),
+                    "name": ROOT_DIR_NAME,
                     "user_id": user_id
                 },
                 None,
@@ -86,7 +84,7 @@ impl Directory {
             id: None,
             user_id,
             parent_id: None,
-            name: ROOT_DIR_NAME.to_owned(),
+            name: ROOT_DIR_NAME.parse()?,
             creation_date: DateTime::now(),
             child_ids: vec![],
             files: vec![],
@@ -108,13 +106,8 @@ impl Directory {
 
         self.id = dir.inserted_id.as_object_id();
 
-        if self.id.is_some() && self.parent_id.is_some() {
-            Directory::add_child_by_oid(
-                self.parent_id.to_owned().unwrap(),
-                self.id.unwrap(),
-                self.user_id,
-            )
-            .await;
+        if let (Some(id), Some(parent_id)) = (self.id, self.parent_id) {
+            Directory::add_child_by_oid(parent_id, id, self.user_id).await?;
         }
 
         Ok(dir)
@@ -123,48 +116,53 @@ impl Directory {
         parent_oid: ObjectId,
         child_oid: ObjectId,
         user_id: ObjectId,
-    ) -> bool {
-        let parent = Directory::get_by_oid(parent_oid, user_id).await;
-        if parent.is_some() {
-            let mut parent = parent.unwrap();
+    ) -> actix_web::Result<()> {
+        let parent = Directory::get_by_oid(parent_oid, user_id).await?;
+        if let Some(mut parent) = parent {
             parent.child_ids.push(child_oid);
-            if parent.update().await.modified_count > 0 {
-                return true;
+            if parent.update().await?.modified_count > 0 {
+                return Ok(());
             }
             event!(
                 Level::INFO,
                 "error adding child to directory {}?",
-                parent.id.unwrap()
+                parent_oid
             );
         }
-        false
+        Err(actix_web::error::ErrorNotFound(
+            "could not get parent directory",
+        ))
     }
     async fn remove_child_by_oid(
         parent_oid: ObjectId,
         child_oid: ObjectId,
         user_id: ObjectId,
-    ) -> bool {
-        let parent = Directory::get_by_oid(parent_oid, user_id).await;
-        if parent.is_some() {
-            let mut parent = parent.unwrap();
+    ) -> actix_web::Result<()> {
+        let parent = Directory::get_by_oid(parent_oid, user_id).await?;
+        if let Some(mut parent) = parent {
             let index = parent
                 .child_ids
                 .iter()
                 .position(|x| *x == child_oid)
                 .unwrap();
             parent.child_ids.remove(index);
-            if parent.update().await.modified_count > 0 {
-                return true;
+            if parent.update().await?.modified_count > 0 {
+                return Ok(());
             }
             event!(
                 Level::INFO,
                 "error removing child from directory {}?",
-                parent.id.unwrap()
+                parent_oid
             );
         }
-        false
+        Err(actix_web::error::ErrorNotFound(
+            "could not get parent directory",
+        ))
     }
-    pub async fn get_by_oid(oid: ObjectId, user_id: ObjectId) -> Option<Directory> {
+    pub async fn get_by_oid(
+        oid: ObjectId,
+        user_id: ObjectId,
+    ) -> actix_web::Result<Option<Directory>> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
@@ -176,11 +174,11 @@ impl Directory {
             None,
         )
         .await
-        .expect("Directory not found")
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
     pub async fn get_all_with_parent_id(
         parent_id: Option<ObjectId>,
-    ) -> Vec<MinimalDirectoryObject> {
+    ) -> actix_web::Result<Vec<MinimalDirectoryObject>> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
@@ -192,20 +190,20 @@ impl Directory {
                 None,
             )
             .await
-            .expect("Directories by parent_id not found");
+            .map_err(|_| actix_web::error::ErrorNotFound("Directories by parent_id not found"))?;
 
         let mut dir_names: Vec<MinimalDirectoryObject> = vec![];
         while let Some(dir) = cursor.next().await {
-            if dir.is_ok() {
+            if let Ok(dir) = dir {
                 dir_names.push(MinimalDirectoryObject {
-                    id: dir.to_owned().unwrap().id.unwrap(),
-                    name: dir.to_owned().unwrap().name,
+                    id: dir.id.unwrap(),
+                    name: dir.name,
                 });
             }
         }
-        dir_names
+        Ok(dir_names)
     }
-    pub async fn update(&mut self) -> UpdateResult {
+    pub async fn update(&mut self) -> actix_web::Result<UpdateResult> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
@@ -224,13 +222,13 @@ impl Directory {
             None,
         )
         .await
-        .expect("Error updating directory")
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
     pub async fn has_user_permission(
         directory_id: ObjectId,
         user_id: ObjectId,
     ) -> actix_web::Result<()> {
-        match Directory::get_by_oid(directory_id, user_id).await {
+        match Directory::get_by_oid(directory_id, user_id).await? {
             Some(dir) if dir.user_id == user_id => Ok(()),
             _ => Err(actix_web::error::ErrorForbidden("missing permission")),
         }
@@ -239,7 +237,7 @@ impl Directory {
         &mut self,
         new_parent_oid: ObjectId,
         _authenticated: &Authenticated<Claims>,
-    ) -> Result<()> {
+    ) -> actix_web::Result<()> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
@@ -248,16 +246,26 @@ impl Directory {
             // do not move if parent_id and new_parent_id are equal or if someone tries to move root
             // todo: does this check really work?
             if parent_id == new_parent_oid {
-                bail!("moving from current parent to current parent is not allowed");
+                return Err(actix_web::error::ErrorInternalServerError(
+                    "moving from current parent to current parent is not allowed",
+                ));
             } else if id == new_parent_oid {
-                bail!("moving directory into it self is not allowed");
+                return Err(actix_web::error::ErrorInternalServerError(
+                    "moving directory into it self is not allowed",
+                ));
             } else if id == _authenticated.claims.thunder_root_dir_id {
-                bail!("moving user root directory is not allowed");
+                return Err(actix_web::error::ErrorInternalServerError(
+                    "moving user root directory is not allowed",
+                ));
             }
 
             Directory::has_user_permission(new_parent_oid, extract_user_oid(_authenticated))
                 .await
-                .map_err(|_| anyhow!("no permission to access the requested parent directory"))?;
+                .map_err(|_| {
+                    actix_web::error::ErrorForbidden(
+                        "no permission to access the requested parent directory",
+                    )
+                })?;
 
             // give dir the new parent id
             col.update_one(
@@ -272,17 +280,19 @@ impl Directory {
                 None,
             )
             .await
-            .expect("Error giving dir a new parent_id");
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
             // add dir as child id to the new parent
-            Directory::add_child_by_oid(new_parent_oid, id, self.user_id).await;
+            Directory::add_child_by_oid(new_parent_oid, id, self.user_id).await?;
 
             // remove child id from old parent
-            Directory::remove_child_by_oid(parent_id, id, self.user_id).await;
+            Directory::remove_child_by_oid(parent_id, id, self.user_id).await?;
 
             self.parent_id = Some(new_parent_oid);
             return Ok(());
         }
-        bail!("no permission or directory does not exist")
+        Err(actix_web::error::ErrorInternalServerError(
+            "no permission or directory does not exist",
+        ))
     }
 }

@@ -67,7 +67,7 @@ pub async fn update(
     _authenticated: Authenticated<Claims>,
     dir_post_data: Json<DirectoryPatch>,
 ) -> actix_web::Result<HttpResponse> {
-    let dir = Directory::get_by_oid(dir_post_data.id, extract_user_oid(&_authenticated)).await;
+    let dir = Directory::get_by_oid(dir_post_data.id, extract_user_oid(&_authenticated)).await?;
 
     let mut dir = dir.ok_or_else(|| {
         actix_web::error::ErrorInternalServerError("Directory could not be found")
@@ -91,7 +91,7 @@ pub async fn update(
 
     if let Some(name) = &dir_post_data.name {
         dir.name = name.to_string();
-        let update_result = dir.update().await;
+        let update_result = dir.update().await?;
 
         if update_result.modified_count <= 0 {
             event!(
@@ -119,15 +119,15 @@ pub async fn get(
         _ => _authenticated.claims.thunder_root_dir_id,
     };
 
-    let dir = Directory::get_by_oid(id, extract_user_oid(&_authenticated)).await;
-
-    let dir = dir.ok_or_else(|| {
-        actix_web::error::ErrorInternalServerError("Could not get requested directory")
-    })?;
-
-    Ok(
-        HttpResponse::Ok().json(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
-            dirs: Directory::get_all_with_parent_id(dir.id).await,
-        })),
-    )
+    let dir = Directory::get_by_oid(id, extract_user_oid(&_authenticated)).await?;
+    match dir {
+        Some(dir) => Ok(
+            HttpResponse::Ok().json(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
+                dirs: Directory::get_all_with_parent_id(dir.id).await?,
+            })),
+        ),
+        _ => Err(actix_web::error::ErrorInternalServerError(
+            "Could not get requested directory",
+        )),
+    }
 }
