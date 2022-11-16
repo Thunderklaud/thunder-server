@@ -58,7 +58,7 @@ pub struct MinimalDirectoryObject {
 }
 
 impl Directory {
-    pub async fn create_user_root_dir(user_id: ObjectId) -> Option<ObjectId> {
+    pub async fn create_user_root_dir(user_id: ObjectId) -> actix_web::Result<ObjectId> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
@@ -72,34 +72,39 @@ impl Directory {
             )
             .await;
 
-        if dir.is_err() || (dir.is_ok() && dir.as_ref().unwrap().is_none()) {
-            // root dir for user does not exist yet
-            let mut new_dir = Directory {
-                id: None,
-                user_id,
-                parent_id: None,
-                name: ROOT_DIR_NAME.to_owned(),
-                creation_date: DateTime::now(),
-                child_ids: vec![],
-                files: vec![],
-            };
-
-            let dir_detail = new_dir.create().await;
-
-            if dir_detail.is_ok() {
-                return dir_detail.unwrap().inserted_id.as_object_id();
+        if let Ok(dir_opt) = dir {
+            if let Some(dir) = dir_opt {
+                // root dir for user already exists
+                return Ok(dir
+                    .id
+                    .expect("could not extract id from database directory"));
             }
-            return None;
         }
 
-        // root dir for user already exists
-        return Some(dir.unwrap().unwrap().id.unwrap());
+        // root dir for user does not exist yet
+        let mut new_dir = Directory {
+            id: None,
+            user_id,
+            parent_id: None,
+            name: ROOT_DIR_NAME.to_owned(),
+            creation_date: DateTime::now(),
+            child_ids: vec![],
+            files: vec![],
+        };
+
+        let dir_detail = new_dir.create().await?;
+        Ok(dir_detail.inserted_id.as_object_id().ok_or_else(|| {
+            actix_web::error::ErrorInternalServerError("creating root dir failed")
+        })?)
     }
-    pub async fn create(&mut self) -> Result<InsertOneResult> {
+    pub async fn create(&mut self) -> actix_web::Result<InsertOneResult> {
         let col: Collection<Directory> = database::get_collection("Directory")
             .await
             .clone_with_type();
-        let dir = col.insert_one(self.borrow(), None).await?;
+        let dir = col
+            .insert_one(self.borrow(), None)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
         self.id = dir.inserted_id.as_object_id();
 

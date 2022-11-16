@@ -53,12 +53,12 @@ pub struct UserRegister {
 }
 
 impl User {
-    pub async fn create(&mut self) -> Result<InsertOneResult, Error> {
+    pub async fn create(&mut self) -> actix_web::Result<InsertOneResult> {
         let col: Collection<User> = database::get_collection("User").await.clone_with_type();
         let user = col
             .insert_one(self.borrow(), None)
             .await
-            .expect("Error creating user");
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
         self.id = user.inserted_id.as_object_id();
         Ok(user)
@@ -85,7 +85,7 @@ impl User {
         .expect("User not found")
     }
 
-    pub async fn get_by_email(email: &str) -> Option<User> {
+    pub async fn get_by_email(email: &str) -> actix_web::Result<Option<User>> {
         let col: Collection<User> = database::get_collection("User").await.clone_with_type();
         col.find_one(
             doc! {
@@ -94,16 +94,16 @@ impl User {
             None,
         )
         .await
-        .expect("User not found")
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
-    pub async fn exists(email: &String) -> bool {
-        User::get_by_email(email.to_owned().as_str())
-            .await
-            .is_some()
+    pub async fn exists(email: &String) -> actix_web::Result<bool> {
+        Ok(User::get_by_email(email.to_owned().as_str())
+            .await?
+            .is_some())
     }
 
-    pub async fn update(&mut self) -> UpdateResult {
+    pub async fn update(&mut self) -> actix_web::Result<UpdateResult> {
         let col: Collection<User> = database::get_collection("User").await.clone_with_type();
         col.update_one(
             doc! {
@@ -122,7 +122,7 @@ impl User {
             None,
         )
         .await
-        .expect("Error updating user")
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
     pub fn is_valid_hash_design(hash: &str) -> bool {
