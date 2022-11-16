@@ -16,20 +16,6 @@ use crate::model::directory::{
 use crate::Claims;
 
 #[derive(Serialize)]
-pub struct DefaultResponse {
-    #[serde(flatten)]
-    result: Option<ResultDataType>,
-    status: bool,
-    error: String,
-}
-
-#[derive(Serialize)]
-enum ResultDataType {
-    #[serde(rename(serialize = "result"))]
-    DirectoryGetResponse(DirectoryGetResponse),
-}
-
-#[derive(Serialize)]
 struct DirectoryGetResponse {
     dirs: Vec<MinimalDirectoryObject>,
 }
@@ -121,11 +107,9 @@ pub async fn get(
 
     let dir = Directory::get_by_oid(id, extract_user_oid(&_authenticated)).await?;
     match dir {
-        Some(dir) => Ok(
-            HttpResponse::Ok().json(ResultDataType::DirectoryGetResponse(DirectoryGetResponse {
-                dirs: Directory::get_all_with_parent_id(dir.id).await?,
-            })),
-        ),
+        Some(dir) => Ok(HttpResponse::Ok().json(DirectoryGetResponse {
+            dirs: Directory::get_all_with_parent_id(dir.id).await?,
+        })),
         _ => Err(actix_web::error::ErrorInternalServerError(
             "Could not get requested directory",
         )),

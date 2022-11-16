@@ -1,14 +1,6 @@
 use std::str::FromStr;
 
 use mongodb::bson::oid::ObjectId;
-use serde::Serialize;
-
-#[derive(Serialize)]
-pub struct DefaultStringResponse {
-    pub result: Option<String>,
-    pub status: bool,
-    pub error: String,
-}
 
 pub fn extract_object_id(
     id: Option<&String>,

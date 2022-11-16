@@ -13,23 +13,14 @@ use crate::model::user::{Role, User, UserLogin, UserRegister};
 use crate::{Claims, Directory, InvalidatedJWTStore};
 
 #[derive(Serialize)]
-pub struct DefaultResponse {
-    #[serde(flatten)]
-    result: Option<ResultDataType>,
-    status: bool,
-    error: String,
-}
-
-#[derive(Serialize)]
-enum ResultDataType {
-    #[serde(rename(serialize = "result"))]
-    TestResponse(TestResponse),
-}
-
-#[derive(Serialize)]
 struct LoginResponse {
     jwt: String,
     claims: Claims,
+}
+
+#[derive(Serialize)]
+struct LogoutResponse {
+    status: bool,
 }
 
 #[derive(Serialize)]
@@ -80,31 +71,24 @@ pub async fn login(
     ));
 }
 
-pub async fn test(_authenticated: Authenticated<Claims>) -> HttpResponse {
-    HttpResponse::Ok().json(DefaultResponse {
-        result: Some(
-            ResultDataType::TestResponse(TestResponse {
-                session_info: _authenticated.clone(),
-                email: User::get_authenticated(&_authenticated)
-                    .await
-                    .unwrap()
-                    .email,
-            })
-            .into(),
-        ),
-        status: true,
-        error: "".to_string(),
-    })
+pub async fn test(_authenticated: Authenticated<Claims>) -> actix_web::Result<HttpResponse> {
+    if let Some(user) = User::get_authenticated(&_authenticated).await? {
+        return Ok(HttpResponse::Ok().json(TestResponse {
+            session_info: _authenticated.clone(),
+            email: user.email,
+        }));
+    }
+    Err(actix_web::error::ErrorExpectationFailed(
+        "authenticated user not found in database",
+    ))
 }
 
 pub async fn logout(
     _authenticated: Authenticated<Claims>,
     invalidated_jwts: Data<InvalidatedJWTStore>,
 ) -> HttpResponse {
-    HttpResponse::Ok().json(DefaultResponse {
-        result: None,
+    HttpResponse::Ok().json(LogoutResponse {
         status: invalidated_jwts.add_to_invalidated(_authenticated).await,
-        error: "".to_string(),
     })
 }
 

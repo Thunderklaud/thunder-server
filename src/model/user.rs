@@ -60,7 +60,9 @@ impl User {
         Ok(user)
     }
 
-    pub async fn get_authenticated(authenticated: &Authenticated<Claims>) -> Option<User> {
+    pub async fn get_authenticated(
+        authenticated: &Authenticated<Claims>,
+    ) -> actix_web::Result<Option<User>> {
         event!(
             Level::INFO,
             "get_authenticated: {}",
@@ -69,7 +71,7 @@ impl User {
         User::get_by_oid(authenticated.claims.sub.as_str()).await
     }
 
-    pub async fn get_by_oid(oid: &str) -> Option<User> {
+    pub async fn get_by_oid(oid: &str) -> actix_web::Result<Option<User>> {
         let col: Collection<User> = database::get_collection("User").await.clone_with_type();
         col.find_one(
             doc! {
@@ -78,7 +80,7 @@ impl User {
             None,
         )
         .await
-        .expect("User not found")
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
     pub async fn get_by_email(email: &str) -> actix_web::Result<Option<User>> {
