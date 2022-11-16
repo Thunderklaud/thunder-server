@@ -44,16 +44,8 @@ pub fn get_default_insert_response(data_detail: Result<InsertOneResult, Error>) 
     }
 }
 
-pub fn get_empty_success_response() -> HttpResponse {
-    HttpResponse::Ok().json(DefaultStringResponse {
-        result: None,
-        status: true,
-        error: "".parse().unwrap(),
-    })
-}
-
 pub fn extract_object_id(
-    id: &Option<String>,
+    id: Option<&String>,
     default_if_none: ObjectId,
 ) -> actix_web::Result<ObjectId> {
     Ok(match id {

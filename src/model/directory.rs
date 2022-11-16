@@ -1,8 +1,8 @@
+use std::borrow::Borrow;
+
 use actix_jwt_authc::Authenticated;
 use anyhow::Result;
 use anyhow::{anyhow, bail};
-use std::borrow::Borrow;
-
 use futures::StreamExt;
 use mongodb::bson::{doc, DateTime};
 use mongodb::results::UpdateResult;
@@ -239,14 +239,14 @@ impl Directory {
             .await
             .clone_with_type();
 
-        if self.id.is_some() && self.parent_id.is_some() {
+        if let (Some(id), Some(parent_id)) = (self.id, self.parent_id) {
             // do not move if parent_id and new_parent_id are equal or if someone tries to move root
             // todo: does this check really work?
-            if self.parent_id.unwrap() == new_parent_oid {
+            if parent_id == new_parent_oid {
                 bail!("moving from current parent to current parent is not allowed");
-            } else if self.id.unwrap() == new_parent_oid {
+            } else if id == new_parent_oid {
                 bail!("moving directory into it self is not allowed");
-            } else if _authenticated.claims.thunder_root_dir_id == self.id.unwrap() {
+            } else if id == _authenticated.claims.thunder_root_dir_id {
                 bail!("moving user root directory is not allowed");
             }
 
@@ -257,7 +257,7 @@ impl Directory {
             // give dir the new parent id
             col.update_one(
                 doc! {
-                    "_id": self.id.unwrap()
+                    "_id": id
                 },
                 doc! {
                     "$set": {
@@ -270,11 +270,10 @@ impl Directory {
             .expect("Error giving dir a new parent_id");
 
             // add dir as child id to the new parent
-            Directory::add_child_by_oid(new_parent_oid, self.id.unwrap(), self.user_id).await;
+            Directory::add_child_by_oid(new_parent_oid, id, self.user_id).await;
 
             // remove child id from old parent
-            Directory::remove_child_by_oid(self.parent_id.unwrap(), self.id.unwrap(), self.user_id)
-                .await;
+            Directory::remove_child_by_oid(parent_id, id, self.user_id).await;
 
             self.parent_id = Some(new_parent_oid);
             return Ok(());
