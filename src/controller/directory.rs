@@ -32,6 +32,12 @@ pub async fn create(
 
     Directory::has_user_permission(parent_id, user_id).await?;
 
+    if dir_post_data.name.is_empty() {
+        return Err(actix_web::error::ErrorBadRequest(
+            "Directory name cannot be empty",
+        ));
+    }
+
     let mut dir = Directory {
         id: None,
         user_id,
@@ -76,6 +82,12 @@ pub async fn update(
     }
 
     if let Some(name) = &dir_post_data.name {
+        if name.is_empty() {
+            return Err(actix_web::error::ErrorBadRequest(
+                "Directory name cannot be empty",
+            ));
+        }
+
         dir.name = name.to_string();
         let update_result = dir.update().await?;
 
