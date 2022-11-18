@@ -15,7 +15,6 @@ use crate::{Claims, Directory, InvalidatedJWTStore};
 #[derive(Serialize)]
 struct LoginResponse {
     jwt: String,
-    claims: Claims,
 }
 
 #[derive(Serialize)]
@@ -59,10 +58,7 @@ pub async fn login(
             )
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-            return Ok(HttpResponse::Ok().json(LoginResponse {
-                jwt: jwt_token,
-                claims: jwt_claims,
-            }));
+            return Ok(HttpResponse::Ok().json(LoginResponse { jwt: jwt_token }));
         }
     }
 
