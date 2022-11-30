@@ -66,6 +66,7 @@ pub async fn multi_upload(
 ) -> actix_web::Result<HttpResponse> {
     let connection = request.connection_info().clone();
     let _host = connection.peer_addr().unwrap_or("unknown host");
+    let mut uploaded_files: Vec<VirtualFile> = Vec::new();
 
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
         let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
@@ -105,12 +106,13 @@ pub async fn multi_upload(
                         dir.update()
                             .await
                             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+                        uploaded_files.push(vfile);
                     }
                     _ => {}
                 }
             }
 
-            return Ok(HttpResponse::Ok().finish());
+            return Ok(HttpResponse::Ok().json(uploaded_files));
         }
 
         return Err(actix_web::error::ErrorBadRequest("Directory not found"));
