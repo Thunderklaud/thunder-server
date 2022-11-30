@@ -28,4 +28,8 @@ impl StorageProvider {
             .await?
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
+    pub fn delete_file(uuid: String) -> std::io::Result<()> {
+        fs::remove_file(StorageProvider::get_direct_file_path(uuid))?;
+        Ok(())
+    }
 }

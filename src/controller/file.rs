@@ -1,7 +1,7 @@
-use actix_files::NamedFile;
 use std::io::Write;
 use std::str::FromStr;
 
+use actix_files::NamedFile;
 use actix_jwt_authc::Authenticated;
 use actix_multipart::Multipart;
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -12,6 +12,7 @@ use mongodb::bson::{DateTime, Uuid};
 use serde::Deserialize;
 
 use crate::jwt_utils::extract_user_oid;
+use crate::model::directory::DirFile;
 use crate::model::virtfile::VirtualFile;
 use crate::storage::storage_provider::StorageProvider;
 use crate::{Claims, Directory};
@@ -113,6 +114,40 @@ pub async fn multi_upload(
             }
 
             return Ok(HttpResponse::Ok().json(uploaded_files));
+        }
+
+        return Err(actix_web::error::ErrorBadRequest("Directory not found"));
+    }
+
+    return Err(actix_web::error::ErrorBadRequest(
+        "Query field directory is not parseable",
+    ));
+}
+
+pub async fn delete(
+    _authenticated: Authenticated<Claims>,
+    query_params: web::Query<GetSingleQueryParams>,
+) -> actix_web::Result<HttpResponse> {
+    if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
+        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        if let Some(mut dir) = dir {
+            let index_in_dir_files = dir.files.iter().position(|x| {
+                let dir_file: Result<DirFile, _> = serde_json::from_value(x.parse().unwrap());
+                if let Ok(dir_file) = dir_file {
+                    return dir_file.uuid.eq(&query_params.uuid);
+                }
+                false
+            });
+
+            if let Some(index_in_dir_files) = index_in_dir_files {
+                StorageProvider::delete_file(query_params.uuid.clone())?;
+                dir.files.remove(index_in_dir_files);
+                dir.update().await?;
+
+                return Ok(HttpResponse::Ok().finish());
+            }
+
+            return Err(actix_web::error::ErrorBadRequest("File not found"));
         }
 
         return Err(actix_web::error::ErrorBadRequest("Directory not found"));
