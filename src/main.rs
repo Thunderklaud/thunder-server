@@ -9,6 +9,7 @@ use anyhow::Result;
 use once_cell::sync::OnceCell;
 use tracing::level_filters::LevelFilter;
 use tracing::{event, Level};
+use crate::storage::storage_provider::StorageProvider;
 
 extern crate strum_macros;
 
@@ -17,6 +18,7 @@ mod database;
 mod jwt_utils;
 mod model;
 mod settings;
+mod storage;
 
 static SETTINGS: OnceCell<settings::Settings> = OnceCell::new();
 
@@ -39,6 +41,8 @@ async fn main() -> Result<()> {
 
     // Print out our settings
     println!("{:#?}", SETTINGS);
+
+    StorageProvider::init(settings)?;
 
     let jwt_signing_keys = if (&settings).jwt_secret.len() > 20 {
         JwtSigningKeys::parse((&settings).jwt_secret.as_str()).unwrap()
@@ -70,7 +74,8 @@ async fn main() -> Result<()> {
                         web::scope("/data")
                             .route("/directory", web::post().to(controller::directory::create))
                             .route("/directory", web::patch().to(controller::directory::update))
-                            .route("/directory", web::get().to(controller::directory::get)),
+                            .route("/directory", web::get().to(controller::directory::get))
+                            .route("/file", web::put().to(controller::file::multi_upload)),
                     ),
             )
     })

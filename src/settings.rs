@@ -26,6 +26,7 @@ pub struct Settings {
     pub database: Database,
     pub server: Server,
     pub jwt_secret: String,
+    pub upload_path: String,
 }
 
 impl Settings {

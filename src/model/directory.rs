@@ -11,6 +11,7 @@ use tracing::{event, Level};
 use crate::database::MyDBModel;
 use crate::jwt_utils::extract_user_oid;
 use crate::{database, Claims};
+use crate::model::virtfile::VirtualFile;
 
 static ROOT_DIR_NAME: &str = "/";
 
@@ -24,7 +25,16 @@ pub struct Directory {
     pub name: String,
     pub creation_date: DateTime,
     pub child_ids: Vec<ObjectId>,
-    pub files: Vec<String>,
+    pub files: Vec<String>,     //serde serialized DirFile in Vec
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirFile {
+    pub uuid: String,
+    pub hash: String,
+    pub name: String,
+    pub finished: bool,
+    pub creation_date: DateTime,
 }
 
 impl MyDBModel for Directory {}
@@ -295,4 +305,42 @@ impl Directory {
             "no permission or directory does not exist",
         ))
     }
+    pub async fn get_files(&self) -> Vec<DirFile> {
+        let mut dir_files: Vec<DirFile> = Vec::new();
+
+        let iter = self.files.iter();
+        for filestr in iter {
+            let dir_file: Result<DirFile, _> = serde_json::from_value(filestr.parse().unwrap());
+            if let Ok(dir_file) = dir_file {
+                dir_files.push(dir_file);
+            }
+        }
+
+        dir_files
+    }
+
+    /*
+    pub async fn find_virtfile_by_name(&mut self, name: String) -> Option<VirtualFile> {
+        if let Some(id) = self.id {
+            let dir_files = self.get_files().await;
+            for dir_file in dir_files {
+                println!("{:?}", dir_file);
+
+                if name.eq(&dir_file.name) {
+                    return Some(VirtualFile {
+                        parent_id: id,
+                        user_id: self.user_id,
+                        uuid: dir_file.uuid,
+                        hash: dir_file.hash,
+                        name: dir_file.name,
+                        finished: dir_file.finished,
+                        creation_date: dir_file.creation_date
+                    });
+                }
+            }
+        }
+
+        return None;
+    }
+    */
 }
