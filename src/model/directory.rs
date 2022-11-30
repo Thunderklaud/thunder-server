@@ -10,8 +10,8 @@ use tracing::{event, Level};
 
 use crate::database::MyDBModel;
 use crate::jwt_utils::extract_user_oid;
-use crate::{database, Claims};
 use crate::model::virtfile::VirtualFile;
+use crate::{database, Claims};
 
 static ROOT_DIR_NAME: &str = "/";
 
@@ -25,7 +25,7 @@ pub struct Directory {
     pub name: String,
     pub creation_date: DateTime,
     pub child_ids: Vec<ObjectId>,
-    pub files: Vec<String>,     //serde serialized DirFile in Vec
+    pub files: Vec<String>, //serde serialized DirFile in Vec
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

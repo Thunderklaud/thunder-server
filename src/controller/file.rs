@@ -3,16 +3,16 @@ use std::str::FromStr;
 
 use actix_jwt_authc::Authenticated;
 use actix_multipart::Multipart;
-use actix_web::{HttpRequest, HttpResponse, web};
+use actix_web::{web, HttpRequest, HttpResponse};
 use futures_util::TryStreamExt;
-use mongodb::bson::{DateTime, Uuid};
 use mongodb::bson::oid::ObjectId;
+use mongodb::bson::{DateTime, Uuid};
 use serde::Deserialize;
 
-use crate::{Claims, Directory};
 use crate::jwt_utils::extract_user_oid;
 use crate::model::virtfile::VirtualFile;
 use crate::storage::storage_provider::StorageProvider;
+use crate::{Claims, Directory};
 
 #[derive(Deserialize)]
 pub struct MultiUploadQueryParams {
@@ -62,7 +62,9 @@ pub async fn multi_upload(
 
                         // Save VirtualFile as DirFile to db
                         dir.files.push(vfile.as_serialized_dir_file());
-                        dir.update().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+                        dir.update()
+                            .await
+                            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
                     }
                     _ => {}
                 }
@@ -71,9 +73,7 @@ pub async fn multi_upload(
             return Ok(HttpResponse::Ok().finish());
         }
 
-        return Err(actix_web::error::ErrorBadRequest(
-            "Directory not found",
-        ));
+        return Err(actix_web::error::ErrorBadRequest("Directory not found"));
     }
 
     return Err(actix_web::error::ErrorBadRequest(

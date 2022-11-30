@@ -1,9 +1,9 @@
-use std::fs;
-use std::fs::File;
 use crate::settings::Settings;
-use std::io::Result as IoResult;
 use actix_web::web;
 use once_cell::sync::OnceCell;
+use std::fs;
+use std::fs::File;
+use std::io::Result as IoResult;
 
 static UPLOAD_PATH: OnceCell<String> = OnceCell::new();
 
@@ -22,7 +22,8 @@ impl StorageProvider {
         let fullpath = format!("{}/{}", UPLOAD_PATH.get().unwrap(), uuid);
 
         // File::create is blocking operation, use threadpool
-        web::block(move || File::create(fullpath)).await?
+        web::block(move || File::create(fullpath))
+            .await?
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 }

@@ -10,13 +10,15 @@ use tracing::{event, Level};
 
 use crate::controller::utils::extract_object_id;
 use crate::jwt_utils::extract_user_oid;
-use crate::model::directory::{Directory, DirectoryGet, DirectoryPatch, DirectoryPost, DirFile, MinimalDirectoryObject};
+use crate::model::directory::{
+    DirFile, Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
+};
 use crate::Claims;
 
 #[derive(Serialize)]
 struct DirectoryGetResponse {
     dirs: Vec<MinimalDirectoryObject>,
-    files: Vec<DirFile>
+    files: Vec<DirFile>,
 }
 
 pub async fn create(
@@ -120,7 +122,7 @@ pub async fn get(
     match dir {
         Some(dir) => Ok(HttpResponse::Ok().json(DirectoryGetResponse {
             dirs: Directory::get_all_with_parent_id(dir.id).await?,
-            files: dir.get_files().await
+            files: dir.get_files().await,
         })),
         _ => Err(actix_web::error::ErrorInternalServerError(
             "Could not get requested directory",
