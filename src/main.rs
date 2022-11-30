@@ -75,7 +75,11 @@ async fn main() -> Result<()> {
                             .route("/directory", web::post().to(controller::directory::create))
                             .route("/directory", web::patch().to(controller::directory::update))
                             .route("/directory", web::get().to(controller::directory::get))
-                            .route("/file", web::put().to(controller::file::multi_upload)),
+                            .route("/file", web::put().to(controller::file::multi_upload))
+                            .service(
+                                web::scope("/download")
+                                    .route("/file", web::get().to(controller::file::get_single)),
+                            ),
                     ),
             )
     })

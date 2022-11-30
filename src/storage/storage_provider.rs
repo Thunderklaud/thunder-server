@@ -16,13 +16,15 @@ impl StorageProvider {
         UPLOAD_PATH.set(settings.upload_path.clone()).unwrap();
         Ok(())
     }
+    pub fn get_direct_file_path(uuid: String) -> String {
+        format!("{}/{}", UPLOAD_PATH.get().unwrap(), uuid)
+    }
     pub async fn create_file_handle(uuid: String) -> actix_web::Result<File> {
         //decide if a new file is required of if the data will be appended to an existing partly uploaded file
         //vfile.create_or_get_id_from_existing_dir().await?;
-        let fullpath = format!("{}/{}", UPLOAD_PATH.get().unwrap(), uuid);
 
         // File::create is blocking operation, use threadpool
-        web::block(move || File::create(fullpath))
+        web::block(move || File::create(StorageProvider::get_direct_file_path(uuid)))
             .await?
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }

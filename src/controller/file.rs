@@ -1,3 +1,4 @@
+use actix_files::NamedFile;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -5,6 +6,7 @@ use actix_jwt_authc::Authenticated;
 use actix_multipart::Multipart;
 use actix_web::{web, HttpRequest, HttpResponse};
 use futures_util::TryStreamExt;
+use mime::Mime;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
 use serde::Deserialize;
@@ -15,8 +17,45 @@ use crate::storage::storage_provider::StorageProvider;
 use crate::{Claims, Directory};
 
 #[derive(Deserialize)]
+pub struct GetSingleQueryParams {
+    uuid: String,
+    directory: String,
+}
+
+#[derive(Deserialize)]
 pub struct MultiUploadQueryParams {
     directory: String,
+}
+
+pub async fn get_single(
+    _authenticated: Authenticated<Claims>,
+    query_params: web::Query<GetSingleQueryParams>,
+) -> actix_web::Result<NamedFile> {
+    if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
+        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        if let Some(dir) = dir {
+            for file in dir.get_files().await {
+                if file.uuid.eq(&query_params.uuid) {
+                    let mut named_file =
+                        NamedFile::open(StorageProvider::get_direct_file_path(file.uuid))?;
+
+                    if let Ok(mime) = Mime::from_str(file.mime.as_str()) {
+                        named_file = named_file.set_content_type(mime);
+                    }
+
+                    return Ok(named_file);
+                }
+            }
+
+            return Err(actix_web::error::ErrorBadRequest("File not found"));
+        }
+
+        return Err(actix_web::error::ErrorBadRequest("Directory not found"));
+    }
+
+    return Err(actix_web::error::ErrorBadRequest(
+        "Query field directory is not parseable",
+    ));
 }
 
 pub async fn multi_upload(
@@ -46,6 +85,7 @@ pub async fn multi_upload(
                             user_id: extract_user_oid(&_authenticated),
                             uuid: Uuid::new().to_string(),
                             hash: "".to_string(),
+                            mime: field.content_type().to_string(),
                             name: filename,
                             finished: true,
                             creation_date: DateTime::now(),

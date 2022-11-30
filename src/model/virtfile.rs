@@ -10,6 +10,7 @@ pub struct VirtualFile {
     pub user_id: ObjectId,
     pub uuid: String,
     pub hash: String,
+    pub mime: String,
     pub name: String,
     pub finished: bool,
     pub creation_date: DateTime,
@@ -20,6 +21,7 @@ impl VirtualFile {
         DirFile {
             uuid: self.uuid.to_owned(),
             hash: self.hash.to_owned(),
+            mime: self.mime.to_owned(),
             name: self.name.to_owned(),
             finished: self.finished.to_owned(),
             creation_date: self.creation_date.to_owned(),

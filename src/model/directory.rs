@@ -10,7 +10,6 @@ use tracing::{event, Level};
 
 use crate::database::MyDBModel;
 use crate::jwt_utils::extract_user_oid;
-use crate::model::virtfile::VirtualFile;
 use crate::{database, Claims};
 
 static ROOT_DIR_NAME: &str = "/";
@@ -32,6 +31,7 @@ pub struct Directory {
 pub struct DirFile {
     pub uuid: String,
     pub hash: String,
+    pub mime: String,
     pub name: String,
     pub finished: bool,
     pub creation_date: DateTime,
