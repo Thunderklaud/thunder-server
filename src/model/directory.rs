@@ -318,6 +318,36 @@ impl Directory {
 
         dir_files
     }
+    pub async fn get_dirfile_by_uuid(&mut self, uuid: String) -> Option<DirFile> {
+        let dir_files = self.get_files().await;
+        for dir_file in dir_files {
+            println!("{:?}", dir_file);
+
+            if uuid.eq(&dir_file.uuid) {
+                return Some(dir_file);
+            }
+        }
+
+        return None;
+    }
+    pub async fn get_files_index_by_file_uuid(&self, uuid: &String) -> Option<usize> {
+        self.files.iter().position(|x| {
+            let dir_file: Result<DirFile, _> = serde_json::from_value(x.parse().unwrap());
+            if let Ok(dir_file) = dir_file {
+                return dir_file.uuid.eq(uuid);
+            }
+            false
+        })
+    }
+    pub async fn get_first_file_index_by_file_name(&self, name: &String) -> Option<usize> {
+        self.files.iter().position(|x| {
+            let dir_file: Result<DirFile, _> = serde_json::from_value(x.parse().unwrap());
+            if let Ok(dir_file) = dir_file {
+                return dir_file.name.eq(name);
+            }
+            false
+        })
+    }
 
     /*
     pub async fn find_virtfile_by_name(&mut self, name: String) -> Option<VirtualFile> {

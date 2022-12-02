@@ -4,6 +4,7 @@ use std::str::FromStr;
 use actix_files::NamedFile;
 use actix_jwt_authc::Authenticated;
 use actix_multipart::Multipart;
+use actix_web::web::Json;
 use actix_web::{web, HttpRequest, HttpResponse};
 use futures_util::TryStreamExt;
 use mime::Mime;
@@ -12,7 +13,6 @@ use mongodb::bson::{DateTime, Uuid};
 use serde::Deserialize;
 
 use crate::jwt_utils::extract_user_oid;
-use crate::model::directory::DirFile;
 use crate::model::virtfile::VirtualFile;
 use crate::storage::storage_provider::StorageProvider;
 use crate::{Claims, Directory};
@@ -26,6 +26,14 @@ pub struct GetSingleQueryParams {
 #[derive(Deserialize)]
 pub struct MultiUploadQueryParams {
     directory: String,
+}
+
+#[derive(Deserialize)]
+pub struct FilePatch {
+    uuid: String,
+    directory: String,
+    name: Option<String>,
+    new_directory: Option<String>,
 }
 
 pub async fn get_single(
@@ -124,6 +132,90 @@ pub async fn multi_upload(
     ));
 }
 
+pub async fn update(
+    _authenticated: Authenticated<Claims>,
+    file_patch_data: Json<FilePatch>,
+) -> actix_web::Result<HttpResponse> {
+    if let Ok(parent_id) = ObjectId::from_str(&file_patch_data.directory.as_str()) {
+        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        if let Some(mut dir) = dir {
+            let dir_file = dir
+                .get_dirfile_by_uuid((&file_patch_data.uuid).clone())
+                .await;
+            let index_in_dir_files = dir
+                .get_files_index_by_file_uuid(&file_patch_data.uuid)
+                .await;
+
+            if let (Some(mut dir_file), Some(index_in_dir_files)) = (dir_file, index_in_dir_files) {
+                // check if file can be renamed
+                if let Some(new_name) = &file_patch_data.name {
+                    // do not rename if new name = current name
+                    if new_name.ne(&dir_file.name) {
+                        // check if there is already a file with the given name in the current directory
+                        let index_of_same_name_file =
+                            dir.get_first_file_index_by_file_name(&new_name).await;
+
+                        if let None = index_of_same_name_file {
+                            dir_file.name = (*new_name).clone();
+                            dir.files.remove(index_in_dir_files);
+                            dir.files.push(serde_json::to_string(&dir_file).unwrap());
+                            dir.update().await?;
+                        } else {
+                            return Err(actix_web::error::ErrorBadRequest("There is already a file with the given name in the current directory"));
+                        }
+                    }
+                }
+
+                // check if file can be moved
+                if let Some(new_directory_id) = &file_patch_data.new_directory {
+                    // check if the new directory is possible
+                    if let Ok(new_directory_oid) = ObjectId::from_str(&new_directory_id.as_str()) {
+                        let new_directory = Directory::get_by_oid(
+                            new_directory_oid,
+                            extract_user_oid(&_authenticated),
+                        )
+                        .await?;
+                        if let Some(mut new_directory) = new_directory {
+                            // check if the new directory already contains a file with the same name
+                            let index_of_same_name_file = new_directory
+                                .get_first_file_index_by_file_name(&dir_file.name)
+                                .await;
+                            if let None = index_of_same_name_file {
+                                dir.files.remove(index_in_dir_files);
+                                new_directory
+                                    .files
+                                    .push(serde_json::to_string(&dir_file).unwrap());
+                                dir.update().await?;
+                                new_directory.update().await?;
+                            } else {
+                                return Err(actix_web::error::ErrorBadRequest("There is already a file with the given name in the new directory"));
+                            }
+                        } else {
+                            return Err(actix_web::error::ErrorBadRequest(
+                                "New directory not found",
+                            ));
+                        }
+                    } else {
+                        return Err(actix_web::error::ErrorBadRequest(
+                            "New directory id not parseable",
+                        ));
+                    }
+                }
+
+                return Ok(HttpResponse::Ok().finish());
+            }
+
+            return Err(actix_web::error::ErrorBadRequest("File not found"));
+        }
+
+        return Err(actix_web::error::ErrorBadRequest("Directory not found"));
+    }
+
+    return Err(actix_web::error::ErrorBadRequest(
+        "Query field directory is not parseable",
+    ));
+}
+
 pub async fn delete(
     _authenticated: Authenticated<Claims>,
     query_params: web::Query<GetSingleQueryParams>,
@@ -131,13 +223,7 @@ pub async fn delete(
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
         let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
-            let index_in_dir_files = dir.files.iter().position(|x| {
-                let dir_file: Result<DirFile, _> = serde_json::from_value(x.parse().unwrap());
-                if let Ok(dir_file) = dir_file {
-                    return dir_file.uuid.eq(&query_params.uuid);
-                }
-                false
-            });
+            let index_in_dir_files = dir.get_files_index_by_file_uuid(&query_params.uuid).await;
 
             if let Some(index_in_dir_files) = index_in_dir_files {
                 StorageProvider::delete_file(query_params.uuid.clone())?;
