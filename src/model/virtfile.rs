@@ -1,8 +1,7 @@
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
 use serde::{Deserialize, Serialize};
-
-use crate::model::directory::DirFile;
+use crate::database::entities::directory::DirFile;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VirtualFile {

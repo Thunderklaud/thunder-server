@@ -1,7 +1,6 @@
 use crate::jwt_utils::{
     get_auth_middleware_settings, get_jwt_ttl, Claims, InvalidatedJWTStore, JwtSigningKeys,
 };
-use crate::model::directory::Directory;
 use crate::storage::storage_provider::StorageProvider;
 use actix_jwt_authc::AuthenticateMiddlewareFactory;
 use actix_web::web::Data;

@@ -10,7 +10,8 @@ use tracing::{event, Level};
 
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
 use crate::model::user::{Role, User, UserLogin, UserRegister};
-use crate::{Claims, Directory, InvalidatedJWTStore};
+use crate::{Claims, InvalidatedJWTStore};
+use crate::database::daos::directory_dao::DirectoryDAO;
 
 #[derive(Serialize)]
 struct LoginResponse {
@@ -117,7 +118,7 @@ pub async fn register(new_user: Json<UserRegister>) -> actix_web::Result<HttpRes
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
     let root_dir_id =
-        Directory::create_user_root_dir(user_detail.inserted_id.as_object_id().unwrap()).await?;
+        DirectoryDAO::create_user_root_dir(user_detail.inserted_id.as_object_id().unwrap()).await?;
 
     data.root_dir_id = Some(root_dir_id);
     data.update().await?;

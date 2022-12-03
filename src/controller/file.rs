@@ -15,7 +15,10 @@ use serde::Deserialize;
 use crate::jwt_utils::extract_user_oid;
 use crate::model::virtfile::VirtualFile;
 use crate::storage::storage_provider::StorageProvider;
-use crate::{Claims, Directory};
+use crate::{Claims};
+use crate::database::daos::dao::DAO;
+use crate::database::daos::directory_dao::DirectoryDAO;
+use crate::database::entities::directory::Directory;
 
 #[derive(Deserialize)]
 pub struct GetSingleQueryParams {
@@ -41,7 +44,7 @@ pub async fn get_single(
     query_params: web::Query<GetSingleQueryParams>,
 ) -> actix_web::Result<NamedFile> {
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
-        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(dir) = dir {
             for file in dir.get_files().await {
                 if file.uuid.eq(&query_params.uuid) {
@@ -78,7 +81,7 @@ pub async fn multi_upload(
     let mut uploaded_files: Vec<VirtualFile> = Vec::new();
 
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
-        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
             while let Some(mut field) = payload.try_next().await? {
                 match field.name() {
@@ -112,7 +115,7 @@ pub async fn multi_upload(
 
                         // Save VirtualFile as DirFile to db
                         dir.files.push(vfile.as_serialized_dir_file());
-                        dir.update()
+                        DirectoryDAO::update(&dir)
                             .await
                             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
                         uploaded_files.push(vfile);
@@ -137,7 +140,7 @@ pub async fn update(
     file_patch_data: Json<FilePatch>,
 ) -> actix_web::Result<HttpResponse> {
     if let Ok(parent_id) = ObjectId::from_str(&file_patch_data.directory.as_str()) {
-        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
             let dir_file = dir
                 .get_dirfile_by_uuid((&file_patch_data.uuid).clone())
@@ -159,7 +162,7 @@ pub async fn update(
                             dir_file.name = (*new_name).clone();
                             dir.files.remove(index_in_dir_files);
                             dir.files.push(serde_json::to_string(&dir_file).unwrap());
-                            dir.update().await?;
+                            DirectoryDAO::update(&mut dir).await?;
                         } else {
                             return Err(actix_web::error::ErrorBadRequest("There is already a file with the given name in the current directory"));
                         }
@@ -170,7 +173,7 @@ pub async fn update(
                 if let Some(new_directory_id) = &file_patch_data.new_directory {
                     // check if the new directory is possible
                     if let Ok(new_directory_oid) = ObjectId::from_str(&new_directory_id.as_str()) {
-                        let new_directory = Directory::get_by_oid(
+                        let new_directory = DirectoryDAO::get_by_oid(
                             new_directory_oid,
                             extract_user_oid(&_authenticated),
                         )
@@ -185,8 +188,9 @@ pub async fn update(
                                 new_directory
                                     .files
                                     .push(serde_json::to_string(&dir_file).unwrap());
-                                dir.update().await?;
-                                new_directory.update().await?;
+
+                                DirectoryDAO::update(&mut dir).await?;
+                                DirectoryDAO::update(&mut new_directory).await?;
                             } else {
                                 return Err(actix_web::error::ErrorBadRequest("There is already a file with the given name in the new directory"));
                             }
@@ -221,14 +225,14 @@ pub async fn delete(
     query_params: web::Query<GetSingleQueryParams>,
 ) -> actix_web::Result<HttpResponse> {
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
-        let dir = Directory::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
             let index_in_dir_files = dir.get_files_index_by_file_uuid(&query_params.uuid).await;
 
             if let Some(index_in_dir_files) = index_in_dir_files {
                 StorageProvider::delete_file(query_params.uuid.clone())?;
                 dir.files.remove(index_in_dir_files);
-                dir.update().await?;
+                DirectoryDAO::update(&mut dir).await?;
 
                 return Ok(HttpResponse::Ok().finish());
             }

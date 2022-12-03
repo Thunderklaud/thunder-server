@@ -9,10 +9,11 @@ use ring::test::from_hex;
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use crate::database::MyDBModel;
-use crate::{database, Claims};
+use crate::{Claims};
 
 use strum_macros::AsRefStr;
+use crate::database::database;
+use crate::database::database::MyDBModel;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
