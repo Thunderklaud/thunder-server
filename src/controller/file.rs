@@ -44,7 +44,7 @@ pub async fn get_single(
     query_params: web::Query<GetSingleQueryParams>,
 ) -> actix_web::Result<NamedFile> {
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
-        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_with_user(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(dir) = dir {
             for file in dir.get_files().await {
                 if file.uuid.eq(&query_params.uuid) {
@@ -81,7 +81,7 @@ pub async fn multi_upload(
     let mut uploaded_files: Vec<VirtualFile> = Vec::new();
 
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
-        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_with_user(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
             while let Some(mut field) = payload.try_next().await? {
                 match field.name() {
@@ -140,7 +140,7 @@ pub async fn update(
     file_patch_data: Json<FilePatch>,
 ) -> actix_web::Result<HttpResponse> {
     if let Ok(parent_id) = ObjectId::from_str(&file_patch_data.directory.as_str()) {
-        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_with_user(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
             let dir_file = dir
                 .get_dirfile_by_uuid((&file_patch_data.uuid).clone())
@@ -173,7 +173,7 @@ pub async fn update(
                 if let Some(new_directory_id) = &file_patch_data.new_directory {
                     // check if the new directory is possible
                     if let Ok(new_directory_oid) = ObjectId::from_str(&new_directory_id.as_str()) {
-                        let new_directory = DirectoryDAO::get_by_oid(
+                        let new_directory = DirectoryDAO::get_with_user(
                             new_directory_oid,
                             extract_user_oid(&_authenticated),
                         )
@@ -225,7 +225,7 @@ pub async fn delete(
     query_params: web::Query<GetSingleQueryParams>,
 ) -> actix_web::Result<HttpResponse> {
     if let Ok(parent_id) = ObjectId::from_str(query_params.directory.as_str()) {
-        let dir = DirectoryDAO::get_by_oid(parent_id, extract_user_oid(&_authenticated)).await?;
+        let dir = DirectoryDAO::get_with_user(parent_id, extract_user_oid(&_authenticated)).await?;
         if let Some(mut dir) = dir {
             let index_in_dir_files = dir.get_files_index_by_file_uuid(&query_params.uuid).await;
 

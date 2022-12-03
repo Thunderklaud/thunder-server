@@ -28,12 +28,23 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
+    async fn get_with_user(oid: ObjectId, user_id: ObjectId) -> actix_web::Result<Option<Directory>> {
+        DirectoryDAO::get_collection().await.find_one(
+            doc! {
+                "_id": oid,
+                "user_id": user_id
+            },
+            None,
+        )
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))
+    }
+
     async fn insert(dir: &mut Directory) -> actix_web::Result<ObjectId> {
         let insert_result = DirectoryDAO::get_collection().await
             .insert_one(dir.borrow(), None)
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-
 
         dir.id = insert_result.inserted_id.as_object_id();
         if let Some(id) = dir.id {
@@ -81,21 +92,6 @@ impl DirectoryDAO {
         database::get_collection("Directory")
             .await
             .clone_with_type()
-    }
-
-    pub async fn get_by_oid(
-        oid: ObjectId,
-        user_id: ObjectId,
-    ) -> actix_web::Result<Option<Directory>> {
-        DirectoryDAO::get_collection().await.find_one(
-            doc! {
-                "_id": oid,
-                "user_id": user_id
-            },
-            None,
-        )
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
     pub async fn get_all_with_parent_id(
@@ -164,7 +160,7 @@ impl DirectoryDAO {
         child_oid: ObjectId,
         user_id: ObjectId,
     ) -> actix_web::Result<()> {
-        let parent = DirectoryDAO::get_by_oid(parent_oid, user_id).await?;
+        let parent = DirectoryDAO::get_with_user(parent_oid, user_id).await?;
         if let Some(mut parent) = parent {
             parent.child_ids.push(child_oid);
             if DirectoryDAO::update(&parent).await? > 0 {
@@ -186,7 +182,7 @@ impl DirectoryDAO {
         child_oid: ObjectId,
         user_id: ObjectId,
     ) -> actix_web::Result<()> {
-        let parent = DirectoryDAO::get_by_oid(parent_oid, user_id).await?;
+        let parent = DirectoryDAO::get_with_user(parent_oid, user_id).await?;
         if let Some(mut parent) = parent {
             let index = parent
                 .child_ids
@@ -212,7 +208,7 @@ impl DirectoryDAO {
         directory_id: ObjectId,
         user_id: ObjectId,
     ) -> actix_web::Result<()> {
-        match DirectoryDAO::get_by_oid(directory_id, user_id).await? {
+        match DirectoryDAO::get_with_user(directory_id, user_id).await? {
             Some(dir) if dir.user_id == user_id => Ok(()),
             _ => Err(actix_web::error::ErrorForbidden("missing permission")),
         }
