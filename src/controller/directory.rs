@@ -2,20 +2,20 @@ use std::borrow::Borrow;
 use std::str::FromStr;
 
 use actix_jwt_authc::Authenticated;
-use actix_web::{HttpResponse, web::Json};
-use mongodb::bson::DateTime;
+use actix_web::{web::Json, HttpResponse};
 use mongodb::bson::oid::ObjectId;
+use mongodb::bson::DateTime;
 use serde::Serialize;
 use tracing::{event, Level};
 
-use crate::Claims;
 use crate::controller::utils::extract_object_id;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::{
-    Directory, DirectoryGet, DirectoryPatch, DirectoryPost, DirFile, MinimalDirectoryObject,
+    DirFile, Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
 };
 use crate::jwt_utils::extract_user_oid;
+use crate::Claims;
 
 #[derive(Serialize)]
 struct DirectoryGetResponse {
@@ -61,7 +61,8 @@ pub async fn update(
     _authenticated: Authenticated<Claims>,
     dir_post_data: Json<DirectoryPatch>,
 ) -> actix_web::Result<HttpResponse> {
-    let dir = DirectoryDAO::get_with_user(dir_post_data.id, extract_user_oid(&_authenticated)).await?;
+    let dir =
+        DirectoryDAO::get_with_user(dir_post_data.id, extract_user_oid(&_authenticated)).await?;
 
     let mut dir = dir.ok_or_else(|| {
         actix_web::error::ErrorInternalServerError("Directory could not be found")
@@ -75,11 +76,13 @@ pub async fn update(
             parent_id
         );
 
-        DirectoryDAO::move_to(&mut dir,
-                              extract_object_id(Some(parent_id), _authenticated.claims.thunder_root_dir_id)?,
-                              _authenticated.borrow(), )
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        DirectoryDAO::move_to(
+            &mut dir,
+            extract_object_id(Some(parent_id), _authenticated.claims.thunder_root_dir_id)?,
+            _authenticated.borrow(),
+        )
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     }
 
     if let Some(name) = &dir_post_data.name {

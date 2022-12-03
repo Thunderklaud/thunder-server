@@ -12,13 +12,12 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
 use serde::Deserialize;
 
+use crate::database::daos::dao::DAO;
+use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::jwt_utils::extract_user_oid;
 use crate::model::virtfile::VirtualFile;
 use crate::storage::storage_provider::StorageProvider;
-use crate::{Claims};
-use crate::database::daos::dao::DAO;
-use crate::database::daos::directory_dao::DirectoryDAO;
-use crate::database::entities::directory::Directory;
+use crate::Claims;
 
 #[derive(Deserialize)]
 pub struct GetSingleQueryParams {

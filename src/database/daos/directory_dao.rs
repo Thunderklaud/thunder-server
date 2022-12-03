@@ -1,16 +1,16 @@
-use std::borrow::Borrow;
-use async_trait::async_trait;
-use mongodb::bson::{DateTime, doc};
-use mongodb::bson::oid::ObjectId;
-use mongodb::Collection;
-use futures::StreamExt;
 use crate::database::daos::dao::DAO;
 use crate::database::database;
 use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
-use tracing::{event, Level};
-use actix_jwt_authc::Authenticated;
-use crate::Claims;
 use crate::jwt_utils::extract_user_oid;
+use crate::Claims;
+use actix_jwt_authc::Authenticated;
+use async_trait::async_trait;
+use futures::StreamExt;
+use mongodb::bson::oid::ObjectId;
+use mongodb::bson::{doc, DateTime};
+use mongodb::Collection;
+use std::borrow::Borrow;
+use tracing::{event, Level};
 
 static ROOT_DIR_NAME: &str = "/";
 pub struct DirectoryDAO {}
@@ -18,30 +18,38 @@ pub struct DirectoryDAO {}
 #[async_trait]
 impl DAO<Directory, ObjectId> for DirectoryDAO {
     async fn get(oid: ObjectId) -> actix_web::Result<Option<Directory>> {
-        DirectoryDAO::get_collection().await.find_one(
-            doc! {
-                "_id": oid
-            },
-            None,
-        )
+        DirectoryDAO::get_collection()
+            .await
+            .find_one(
+                doc! {
+                    "_id": oid
+                },
+                None,
+            )
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
-    async fn get_with_user(oid: ObjectId, user_id: ObjectId) -> actix_web::Result<Option<Directory>> {
-        DirectoryDAO::get_collection().await.find_one(
-            doc! {
-                "_id": oid,
-                "user_id": user_id
-            },
-            None,
-        )
+    async fn get_with_user(
+        oid: ObjectId,
+        user_id: ObjectId,
+    ) -> actix_web::Result<Option<Directory>> {
+        DirectoryDAO::get_collection()
+            .await
+            .find_one(
+                doc! {
+                    "_id": oid,
+                    "user_id": user_id
+                },
+                None,
+            )
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
     async fn insert(dir: &mut Directory) -> actix_web::Result<ObjectId> {
-        let insert_result = DirectoryDAO::get_collection().await
+        let insert_result = DirectoryDAO::get_collection()
+            .await
             .insert_one(dir.borrow(), None)
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
@@ -55,34 +63,40 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
             return Ok(id);
         }
 
-        Err(actix_web::error::ErrorInternalServerError("failed converting inserted_id to ObjectId"))
+        Err(actix_web::error::ErrorInternalServerError(
+            "failed converting inserted_id to ObjectId",
+        ))
     }
 
     async fn update(dir: &Directory) -> actix_web::Result<u64> {
         if let Some(id) = dir.id {
-            let update_result = DirectoryDAO::get_collection().await.update_one(
-                doc! {
-                "_id": id
-            },
-                doc! {
-                "$set": {
-                    "parent_id": dir.parent_id.to_owned(),
-                    "name": dir.name.to_owned(),
-                    "child_ids": dir.child_ids.to_owned(),
-                    "files": dir.files.to_owned(),
-                }
-            },
-                None,
-            )
+            let update_result = DirectoryDAO::get_collection()
+                .await
+                .update_one(
+                    doc! {
+                        "_id": id
+                    },
+                    doc! {
+                        "$set": {
+                            "parent_id": dir.parent_id.to_owned(),
+                            "name": dir.name.to_owned(),
+                            "child_ids": dir.child_ids.to_owned(),
+                            "files": dir.files.to_owned(),
+                        }
+                    },
+                    None,
+                )
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
             return Ok(update_result.modified_count);
         }
 
-        Err(actix_web::error::ErrorInternalServerError("directory id not found"))
+        Err(actix_web::error::ErrorInternalServerError(
+            "directory id not found",
+        ))
     }
 
-    async fn delete(dir: &mut Directory) -> actix_web::Result<Option<ObjectId>> {
+    async fn delete(_: &mut Directory) -> actix_web::Result<Option<ObjectId>> {
         todo!()
     }
 }
@@ -97,7 +111,8 @@ impl DirectoryDAO {
     pub async fn get_all_with_parent_id(
         parent_id: Option<ObjectId>,
     ) -> actix_web::Result<Vec<MinimalDirectoryObject>> {
-        let mut cursor = DirectoryDAO::get_collection().await
+        let mut cursor = DirectoryDAO::get_collection()
+            .await
             .find(
                 doc! {
                     "parent_id": parent_id
@@ -120,7 +135,8 @@ impl DirectoryDAO {
     }
 
     pub async fn create_user_root_dir(user_id: ObjectId) -> actix_web::Result<ObjectId> {
-        let dir = DirectoryDAO::get_collection().await
+        let dir = DirectoryDAO::get_collection()
+            .await
             .find_one(
                 doc! {
                     "name": ROOT_DIR_NAME,
@@ -245,17 +261,19 @@ impl DirectoryDAO {
                 })?;
 
             // give dir the new parent id
-            DirectoryDAO::get_collection().await.update_one(
-                doc! {
-                    "_id": id
-                },
-                doc! {
-                    "$set": {
-                        "parent_id": new_parent_oid
-                    }
-                },
-                None,
-            )
+            DirectoryDAO::get_collection()
+                .await
+                .update_one(
+                    doc! {
+                        "_id": id
+                    },
+                    doc! {
+                        "$set": {
+                            "parent_id": new_parent_oid
+                        }
+                    },
+                    None,
+                )
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 

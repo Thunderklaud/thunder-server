@@ -1,11 +1,9 @@
-use mongodb::bson::{doc, DateTime};
-use mongodb::{bson::oid::ObjectId};
-use serde::{Deserialize, Serialize};
-use tracing::{event, Level};
+use mongodb::bson::oid::ObjectId;
 use ring::test::from_hex;
+use serde::{Deserialize, Serialize};
 
-use strum_macros::AsRefStr;
 use crate::database::database::MyDBModel;
+use strum_macros::AsRefStr;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
@@ -40,7 +38,6 @@ pub struct UserRegister {
     pub email: String,
     pub pw_hash: String,
 }
-
 
 impl User {
     pub fn is_valid_hash_design(hash: &str) -> bool {

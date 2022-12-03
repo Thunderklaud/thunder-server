@@ -1,8 +1,6 @@
-
+use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
-use mongodb::{bson::oid::ObjectId};
 use serde::{Deserialize, Serialize};
-use tracing::{event, Level};
 
 use crate::database::database::MyDBModel;
 
@@ -106,27 +104,27 @@ impl Directory {
     }
 
     /*
-   pub async fn find_virtfile_by_name(&mut self, name: String) -> Option<VirtualFile> {
-       if let Some(id) = self.id {
-           let dir_files = self.get_files().await;
-           for dir_file in dir_files {
-               println!("{:?}", dir_file);
+    pub async fn find_virtfile_by_name(&mut self, name: String) -> Option<VirtualFile> {
+        if let Some(id) = self.id {
+            let dir_files = self.get_files().await;
+            for dir_file in dir_files {
+                println!("{:?}", dir_file);
 
-               if name.eq(&dir_file.name) {
-                   return Some(VirtualFile {
-                       parent_id: id,
-                       user_id: self.user_id,
-                       uuid: dir_file.uuid,
-                       hash: dir_file.hash,
-                       name: dir_file.name,
-                       finished: dir_file.finished,
-                       creation_date: dir_file.creation_date
-                   });
-               }
-           }
-       }
+                if name.eq(&dir_file.name) {
+                    return Some(VirtualFile {
+                        parent_id: id,
+                        user_id: self.user_id,
+                        uuid: dir_file.uuid,
+                        hash: dir_file.hash,
+                        name: dir_file.name,
+                        finished: dir_file.finished,
+                        creation_date: dir_file.creation_date
+                    });
+                }
+            }
+        }
 
-       return None;
-   }
-   */
+        return None;
+    }
+    */
 }

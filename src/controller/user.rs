@@ -8,12 +8,12 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};
 
-use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
-use crate::{Claims, InvalidatedJWTStore};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::user_dao::UserDAO;
 use crate::database::entities::user::{Role, User, UserLogin, UserRegister};
+use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
+use crate::{Claims, InvalidatedJWTStore};
 
 #[derive(Serialize)]
 struct LoginResponse {
