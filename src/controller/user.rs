@@ -11,24 +11,16 @@ use tracing::{event, Level};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::user_dao::UserDAO;
-use crate::database::entities::user::{Role, User, UserLogin, UserRegister};
+use crate::database::entities::user::{
+    LoginResponse, LogoutResponse, Role, User, UserLogin, UserRegister,
+};
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
 use crate::{Claims, InvalidatedJWTStore};
 
 #[derive(Serialize)]
-struct LoginResponse {
-    jwt: String,
-}
-
-#[derive(Serialize)]
-struct LogoutResponse {
-    status: bool,
-}
-
-#[derive(Serialize)]
-struct TestResponse {
-    session_info: Authenticated<Claims>,
-    email: String,
+pub struct TestResponse {
+    pub session_info: Authenticated<Claims>,
+    pub email: String,
 }
 
 pub async fn login(
@@ -70,6 +62,7 @@ pub async fn login(
     ));
 }
 
+//todo: remove
 pub async fn test(_authenticated: Authenticated<Claims>) -> actix_web::Result<HttpResponse> {
     if let Some(user) = UserDAO::get_authenticated(&_authenticated).await? {
         return Ok(HttpResponse::Ok().json(TestResponse {

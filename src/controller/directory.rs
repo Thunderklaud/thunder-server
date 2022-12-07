@@ -5,24 +5,16 @@ use actix_jwt_authc::Authenticated;
 use actix_web::{web, web::Json, HttpResponse};
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::DateTime;
-use serde::Serialize;
 use tracing::{event, Level};
 
 use crate::controller::utils::extract_object_id;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::{
-    Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
+    Directory, DirectoryGet, DirectoryGetResponse, DirectoryPatch, DirectoryPost,
 };
-use crate::database::entities::file::File;
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
-
-#[derive(Serialize)]
-struct DirectoryGetResponse {
-    dirs: Vec<MinimalDirectoryObject>,
-    files: Vec<File>,
-}
 
 pub async fn create(
     _authenticated: Authenticated<Claims>,

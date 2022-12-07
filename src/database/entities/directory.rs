@@ -44,6 +44,12 @@ pub struct DirectoryGet {
     pub id: Option<String>,
 }
 
+#[derive(Serialize)]
+pub struct DirectoryGetResponse {
+    pub dirs: Vec<MinimalDirectoryObject>,
+    pub files: Vec<File>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MinimalDirectoryObject {
     pub id: ObjectId,

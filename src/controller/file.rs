@@ -10,32 +10,16 @@ use futures_util::TryStreamExt;
 use mime::Mime;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
-use serde::Deserialize;
 
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
-use crate::database::entities::file::File;
+use crate::database::entities::file::{
+    File, FilePatch, GetSingleQueryParams, MultiUploadQueryParams,
+};
 use crate::jwt_utils::extract_user_oid;
 use crate::storage::storage_provider::StorageProvider;
 use crate::Claims;
-
-#[derive(Deserialize)]
-pub struct GetSingleQueryParams {
-    uuid: String,
-}
-
-#[derive(Deserialize)]
-pub struct MultiUploadQueryParams {
-    directory: String,
-}
-
-#[derive(Deserialize)]
-pub struct FilePatch {
-    uuid: String,
-    new_name: Option<String>,
-    new_directory: Option<String>,
-}
 
 pub async fn get_single(
     _authenticated: Authenticated<Claims>,

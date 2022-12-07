@@ -35,6 +35,16 @@ pub struct UserLogin {
     pub pw_hash: String,
 }
 
+#[derive(Serialize)]
+pub struct LoginResponse {
+    pub jwt: String,
+}
+
+#[derive(Serialize)]
+pub struct LogoutResponse {
+    pub status: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserRegister {
     pub firstname: String,

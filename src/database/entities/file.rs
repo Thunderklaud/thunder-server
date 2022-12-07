@@ -22,3 +22,20 @@ impl MyDBModel for File {
         "File"
     }
 }
+
+#[derive(Deserialize)]
+pub struct GetSingleQueryParams {
+    pub uuid: String,
+}
+
+#[derive(Deserialize)]
+pub struct MultiUploadQueryParams {
+    pub directory: String,
+}
+
+#[derive(Deserialize)]
+pub struct FilePatch {
+    pub uuid: String,
+    pub new_name: Option<String>,
+    pub new_directory: Option<String>,
+}
