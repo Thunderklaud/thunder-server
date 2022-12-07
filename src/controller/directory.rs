@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::str::FromStr;
 
 use actix_jwt_authc::Authenticated;
-use actix_web::{web::Json, HttpResponse};
+use actix_web::{web, web::Json, HttpResponse};
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::DateTime;
 use serde::Serialize;
@@ -112,7 +112,7 @@ pub async fn update(
 
 pub async fn get(
     _authenticated: Authenticated<Claims>,
-    dir_get_data: Json<DirectoryGet>,
+    dir_get_data: web::Query<DirectoryGet>,
 ) -> actix_web::Result<HttpResponse> {
     let id = match &dir_get_data.id {
         Some(id) if !id.is_empty() => {
