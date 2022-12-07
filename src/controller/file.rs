@@ -81,6 +81,10 @@ pub async fn multi_upload(
                             .get_filename()
                             .map_or_else(|| Uuid::new().to_string(), sanitize_filename::sanitize);
 
+                        if dir.has_file_with_name(&filename).await {
+                            continue;
+                        }
+
                         let mut file = File {
                             id: None,
                             parent_id: dir.id.unwrap(),
