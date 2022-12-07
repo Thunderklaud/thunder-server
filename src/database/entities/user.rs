@@ -17,7 +17,11 @@ pub struct User {
     pub root_dir_id: Option<ObjectId>,
 }
 
-impl MyDBModel for User {}
+impl MyDBModel for User {
+    fn type_name() -> &'static str {
+        "User"
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, AsRefStr)]
 pub enum Role {

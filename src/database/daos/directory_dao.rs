@@ -1,5 +1,4 @@
 use crate::database::daos::dao::DAO;
-use crate::database::database;
 use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
@@ -8,7 +7,6 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
-use mongodb::Collection;
 use std::borrow::Borrow;
 use tracing::{event, Level};
 
@@ -81,7 +79,6 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
                             "parent_id": dir.parent_id.to_owned(),
                             "name": dir.name.to_owned(),
                             "child_ids": dir.child_ids.to_owned(),
-                            "files": dir.files.to_owned(),
                         }
                     },
                     None,
@@ -96,18 +93,12 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
         ))
     }
 
-    async fn delete(_: &mut Directory) -> actix_web::Result<Option<ObjectId>> {
+    async fn delete(_: &Directory) -> actix_web::Result<u64> {
         todo!()
     }
 }
 
 impl DirectoryDAO {
-    async fn get_collection() -> Collection<Directory> {
-        database::get_collection("Directory")
-            .await
-            .clone_with_type()
-    }
-
     pub async fn get_all_with_parent_id(
         parent_id: Option<ObjectId>,
     ) -> actix_web::Result<Vec<MinimalDirectoryObject>> {
@@ -163,7 +154,6 @@ impl DirectoryDAO {
             name: ROOT_DIR_NAME.parse()?,
             creation_date: DateTime::now(),
             child_ids: vec![],
-            files: vec![],
         };
 
         Ok(DirectoryDAO::insert(&mut new_dir)

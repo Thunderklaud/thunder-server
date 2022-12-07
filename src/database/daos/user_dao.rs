@@ -1,5 +1,4 @@
 use crate::database::daos::dao::DAO;
-use crate::database::database;
 use crate::database::entities::user::User;
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
@@ -7,7 +6,6 @@ use actix_jwt_authc::Authenticated;
 use async_trait::async_trait;
 use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
-use mongodb::Collection;
 use std::borrow::Borrow;
 use tracing::{event, Level};
 
@@ -79,19 +77,13 @@ impl DAO<User, ObjectId> for UserDAO {
         ))
     }
 
-    async fn delete(_: &mut User) -> actix_web::Result<Option<ObjectId>> {
+    async fn delete(_: &User) -> actix_web::Result<u64> {
         todo!()
     }
 }
 
 // custom methods
 impl UserDAO {
-    async fn get_collection() -> Collection<User> {
-        database::get_collection("Directory")
-            .await
-            .clone_with_type()
-    }
-
     pub async fn get_authenticated(
         authenticated: &Authenticated<Claims>,
     ) -> actix_web::Result<Option<User>> {

@@ -12,15 +12,16 @@ use crate::controller::utils::extract_object_id;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::{
-    DirFile, Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
+    Directory, DirectoryGet, DirectoryPatch, DirectoryPost, MinimalDirectoryObject,
 };
+use crate::database::entities::file::File;
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
 
 #[derive(Serialize)]
 struct DirectoryGetResponse {
     dirs: Vec<MinimalDirectoryObject>,
-    files: Vec<DirFile>,
+    files: Vec<File>,
 }
 
 pub async fn create(
@@ -48,7 +49,6 @@ pub async fn create(
         name: dir_post_data.name.to_owned().to_string(),
         creation_date: DateTime::now(),
         child_ids: vec![],
-        files: vec![],
     };
 
     let dir_detail = DirectoryDAO::insert(&mut dir)

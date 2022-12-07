@@ -15,7 +15,6 @@ extern crate strum_macros;
 mod controller;
 mod database;
 mod jwt_utils;
-mod model;
 mod settings;
 mod storage;
 
