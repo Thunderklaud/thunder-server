@@ -111,7 +111,7 @@ impl DAO<File, ObjectId> for FileDAO {
 }
 
 impl FileDAO {
-    pub async fn get_file_by_uuid(uuid: &String) -> actix_web::Result<Option<File>> {
+    /*pub async fn get_file_by_uuid(uuid: &String) -> actix_web::Result<Option<File>> {
         //todo: add uuid -> oid cache map to use DAO get function
         Self::get_collection()
             .await
@@ -123,7 +123,7 @@ impl FileDAO {
             )
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
-    }
+    }*/
     pub async fn get_file_by_uuid_for_user(
         uuid: &String,
         user_id: ObjectId,
