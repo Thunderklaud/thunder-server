@@ -8,24 +8,19 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{event, Level};
 
+use crate::database::daos::dao::DAO;
+use crate::database::daos::directory_dao::DirectoryDAO;
+use crate::database::daos::user_dao::UserDAO;
+use crate::database::entities::user::{
+    LoginResponse, LogoutResponse, Role, User, UserLogin, UserRegister,
+};
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
-use crate::model::user::{Role, User, UserLogin, UserRegister};
-use crate::{Claims, Directory, InvalidatedJWTStore};
+use crate::{Claims, InvalidatedJWTStore};
 
 #[derive(Serialize)]
-struct LoginResponse {
-    jwt: String,
-}
-
-#[derive(Serialize)]
-struct LogoutResponse {
-    status: bool,
-}
-
-#[derive(Serialize)]
-struct TestResponse {
-    session_info: Authenticated<Claims>,
-    email: String,
+pub struct TestResponse {
+    pub session_info: Authenticated<Claims>,
+    pub email: String,
 }
 
 pub async fn login(
@@ -35,7 +30,7 @@ pub async fn login(
 ) -> actix_web::Result<HttpResponse> {
     event!(Level::INFO, "login_user: {}", login_user.email);
 
-    let user = User::get_by_email(login_user.email.as_str()).await?;
+    let user = UserDAO::get_by_email(login_user.email.as_str()).await?;
 
     if let Some(user) = user {
         if let (Some(id), Some(root_dir_id)) = (user.id, user.root_dir_id) {
@@ -67,8 +62,9 @@ pub async fn login(
     ));
 }
 
+//todo: remove
 pub async fn test(_authenticated: Authenticated<Claims>) -> actix_web::Result<HttpResponse> {
-    if let Some(user) = User::get_authenticated(&_authenticated).await? {
+    if let Some(user) = UserDAO::get_authenticated(&_authenticated).await? {
         return Ok(HttpResponse::Ok().json(TestResponse {
             session_info: _authenticated.clone(),
             email: user.email,
@@ -96,7 +92,7 @@ pub async fn register(new_user: Json<UserRegister>) -> actix_web::Result<HttpRes
         ));
     }
 
-    if User::exists(&new_user.email).await? {
+    if UserDAO::exists(&new_user.email).await? {
         return Err(actix_web::error::ErrorExpectationFailed(
             "User with email already exists",
         ));
@@ -111,16 +107,15 @@ pub async fn register(new_user: Json<UserRegister>) -> actix_web::Result<HttpRes
         role: Role::BaseUser,
         root_dir_id: None,
     };
-    let user_detail = data
-        .create()
+
+    let inserted_user_id = UserDAO::insert(&mut data)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-    let root_dir_id =
-        Directory::create_user_root_dir(user_detail.inserted_id.as_object_id().unwrap()).await?;
+    let root_dir_id = DirectoryDAO::create_user_root_dir(inserted_user_id).await?;
 
     data.root_dir_id = Some(root_dir_id);
-    data.update().await?;
+    UserDAO::update(&data).await?;
 
-    Ok(HttpResponse::Ok().json(user_detail))
+    Ok(HttpResponse::Ok().json(inserted_user_id))
 }

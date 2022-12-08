@@ -1,7 +1,7 @@
 use crate::jwt_utils::{
     get_auth_middleware_settings, get_jwt_ttl, Claims, InvalidatedJWTStore, JwtSigningKeys,
 };
-use crate::model::directory::Directory;
+use crate::storage::storage_provider::StorageProvider;
 use actix_jwt_authc::AuthenticateMiddlewareFactory;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
@@ -15,8 +15,8 @@ extern crate strum_macros;
 mod controller;
 mod database;
 mod jwt_utils;
-mod model;
 mod settings;
+mod storage;
 
 static SETTINGS: OnceCell<settings::Settings> = OnceCell::new();
 
@@ -39,6 +39,8 @@ async fn main() -> Result<()> {
 
     // Print out our settings
     println!("{:#?}", SETTINGS);
+
+    StorageProvider::init(settings)?;
 
     let jwt_signing_keys = if (&settings).jwt_secret.len() > 20 {
         JwtSigningKeys::parse((&settings).jwt_secret.as_str()).unwrap()
@@ -70,7 +72,14 @@ async fn main() -> Result<()> {
                         web::scope("/data")
                             .route("/directory", web::post().to(controller::directory::create))
                             .route("/directory", web::patch().to(controller::directory::update))
-                            .route("/directory", web::get().to(controller::directory::get)),
+                            .route("/directory", web::get().to(controller::directory::get))
+                            .route("/file", web::put().to(controller::file::multi_upload))
+                            .route("/file", web::patch().to(controller::file::update))
+                            .route("/file", web::delete().to(controller::file::delete))
+                            .service(
+                                web::scope("/download")
+                                    .route("/file", web::get().to(controller::file::get_single)),
+                            ),
                     ),
             )
     })

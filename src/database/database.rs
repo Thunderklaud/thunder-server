@@ -2,7 +2,9 @@ use mongodb::{Client, Collection, Database};
 
 use crate::SETTINGS;
 
-pub trait MyDBModel {}
+pub trait MyDBModel {
+    fn type_name() -> &'static str;
+}
 
 pub async fn establish_connection() -> Option<Database> {
     let settings = SETTINGS.get().unwrap();
@@ -13,7 +15,7 @@ pub async fn establish_connection() -> Option<Database> {
     Some(client.unwrap().database(&settings.database.name))
 }
 
-pub async fn get_collection(cname: &str) -> Collection<Box<dyn MyDBModel>> {
+pub async fn get_collection<ENTITY: MyDBModel>() -> Collection<ENTITY> {
     let db = establish_connection().await.unwrap();
-    db.collection(cname)
+    db.collection::<ENTITY>(ENTITY::type_name())
 }
