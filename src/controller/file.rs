@@ -138,7 +138,7 @@ pub async fn update(
 
                         let _ = SyncStateDAO::insert(&mut SyncState::new(
                             SyncStateType::File,
-                            SyncStateAction::Create,
+                            SyncStateAction::Rename,
                             file.id.unwrap(),
                             Some(file.parent_id),
                             file.user_id,

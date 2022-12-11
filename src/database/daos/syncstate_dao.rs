@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures_util::StreamExt;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
-use mongodb::options::FindOptions;
 
 use crate::database::daos::dao::DAO;
 use crate::database::entities::syncstate::SyncState;
@@ -82,17 +81,15 @@ impl SyncStateDAO {
         user_id: ObjectId,
     ) -> actix_web::Result<Vec<SyncState>> {
         let mut states: Vec<SyncState> = Vec::new();
-        let find_options = FindOptions::builder()
-            .min(doc! { "creation_date": since })
-            .build();
 
         let mut cursor = Self::get_collection()
             .await
             .find(
                 doc! {
-                    "user_id": user_id
+                    "user_id": user_id,
+                    "creation_date": {"$gte": since},
                 },
-                find_options,
+                None,
             )
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
