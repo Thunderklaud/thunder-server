@@ -51,13 +51,14 @@ impl DAO<File, ObjectId> for FileDAO {
         file.id = insert_result.inserted_id.as_object_id();
 
         if let Some(id) = file.id {
-            let _ = SyncStateDAO::insert(&mut SyncState::add(
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
                 SyncStateType::File,
                 SyncStateAction::Create,
                 id,
                 Some(file.parent_id),
                 file.user_id,
-            ));
+            ))
+            .await?;
 
             return Ok(id);
         }
@@ -112,13 +113,15 @@ impl DAO<File, ObjectId> for FileDAO {
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-            let _ = SyncStateDAO::insert(&mut SyncState::add(
+            SyncStateDAO::delete_for_corresponding_id(id).await?;
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
                 SyncStateType::File,
                 SyncStateAction::Delete,
                 id,
                 Some(file.parent_id),
                 file.user_id,
-            ));
+            ))
+            .await?;
 
             return Ok(delete_result.deleted_count);
         }

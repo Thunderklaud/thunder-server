@@ -56,4 +56,20 @@ impl DAO<SyncState, ObjectId> for SyncStateDAO {
 }
 
 // custom methods
-impl SyncStateDAO {}
+impl SyncStateDAO {
+    pub async fn delete_for_corresponding_id(
+        corresponding_id: ObjectId,
+    ) -> actix_web::error::Result<()> {
+        Self::get_collection()
+            .await
+            .delete_many(
+                doc! {
+                    "corresponding_id": corresponding_id
+                },
+                None,
+            )
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        Ok(())
+    }
+}
