@@ -7,11 +7,11 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::bson::DateTime;
 use tracing::{event, Level};
 
-use crate::controller::utils::extract_object_id;
+use crate::controller::utils::{extract_object_id, extract_object_id_or_die};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::{
-    Directory, DirectoryGet, DirectoryGetResponse, DirectoryPatch, DirectoryPost,
+    Directory, DirectoryDelete, DirectoryGet, DirectoryGetResponse, DirectoryPatch, DirectoryPost,
 };
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
@@ -83,6 +83,25 @@ pub async fn update(
 
         DirectoryDAO::rename(&mut dir, name).await?;
     }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+pub async fn delete(
+    _authenticated: Authenticated<Claims>,
+    dir_delete_data: web::Query<DirectoryDelete>,
+) -> actix_web::Result<HttpResponse> {
+    let dir = DirectoryDAO::get_with_user(
+        extract_object_id_or_die(Some(&dir_delete_data.id))?,
+        extract_user_oid(&_authenticated),
+    )
+    .await?;
+
+    let dir = dir.ok_or_else(|| {
+        actix_web::error::ErrorInternalServerError("Directory could not be found")
+    })?;
+
+    DirectoryDAO::delete(&dir).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

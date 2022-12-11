@@ -73,6 +73,10 @@ async fn main() -> Result<()> {
                         web::scope("/data")
                             .route("/directory", web::post().to(controller::directory::create))
                             .route("/directory", web::patch().to(controller::directory::update))
+                            .route(
+                                "/directory",
+                                web::delete().to(controller::directory::delete),
+                            )
                             .route("/directory", web::get().to(controller::directory::get))
                             .route("/file", web::put().to(controller::file::multi_upload))
                             .route("/file", web::patch().to(controller::file::update))

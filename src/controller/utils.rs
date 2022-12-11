@@ -13,3 +13,11 @@ pub fn extract_object_id(
         _ => default_if_none,
     })
 }
+
+pub fn extract_object_id_or_die(id: Option<&String>) -> actix_web::Result<ObjectId> {
+    if let Some(id) = id {
+        return Ok(ObjectId::from_str(id).map_err(|e| actix_web::error::ErrorBadRequest(e))?);
+    }
+
+    Err(actix_web::error::ErrorBadRequest("no ObjectId to extract"))
+}
