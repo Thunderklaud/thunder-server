@@ -1,5 +1,7 @@
 use crate::database::daos::dao::DAO;
+use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
+use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
 use actix_jwt_authc::Authenticated;
@@ -57,6 +59,13 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
             if let Some(parent_id) = dir.parent_id {
                 DirectoryDAO::add_child_by_oid(parent_id, id, dir.user_id).await?;
             }
+
+            let _ = SyncStateDAO::insert(&mut SyncState::add(
+                SyncStateType::Directory,
+                SyncStateAction::Create,
+                id,
+                dir.user_id,
+            ));
 
             return Ok(id);
         }
@@ -220,6 +229,31 @@ impl DirectoryDAO {
         }
     }
 
+    pub async fn rename(dir: &mut Directory, new_name: &String) -> actix_web::Result<()> {
+        dir.name = new_name.to_string();
+
+        let update_result = DirectoryDAO::update(dir).await?;
+        if update_result <= 0 {
+            event!(
+                Level::DEBUG,
+                "renaming directory failed {:?}",
+                update_result
+            );
+            return Err(actix_web::error::ErrorInternalServerError(
+                "Renaming directory failed",
+            ));
+        }
+
+        let _ = SyncStateDAO::insert(&mut SyncState::add(
+            SyncStateType::Directory,
+            SyncStateAction::Rename,
+            dir.id.unwrap(),
+            dir.user_id,
+        ));
+
+        Ok(())
+    }
+
     pub async fn move_to(
         dir: &mut Directory,
         new_parent_oid: ObjectId,
@@ -272,6 +306,13 @@ impl DirectoryDAO {
 
             // remove child id from old parent
             DirectoryDAO::remove_child_by_oid(parent_id, id, dir.user_id).await?;
+
+            let _ = SyncStateDAO::insert(&mut SyncState::add(
+                SyncStateType::Directory,
+                SyncStateAction::Move,
+                id,
+                dir.user_id,
+            ));
 
             dir.parent_id = Some(new_parent_oid);
             return Ok(());
