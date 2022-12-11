@@ -136,13 +136,14 @@ pub async fn update(
                         file.name = (*new_name).clone();
                         changed = true;
 
-                        let _ = SyncStateDAO::insert(&mut SyncState::add(
+                        let _ = SyncStateDAO::insert(&mut SyncState::new(
                             SyncStateType::File,
                             SyncStateAction::Create,
                             file.id.unwrap(),
                             Some(file.parent_id),
                             file.user_id,
-                        ));
+                        ))
+                        .await?;
                     } else {
                         return Err(actix_web::error::ErrorBadRequest(
                             "There is already a file with the given name in the current directory",
@@ -164,13 +165,14 @@ pub async fn update(
                             file.parent_id = new_directory_oid;
                             changed = true;
 
-                            let _ = SyncStateDAO::insert(&mut SyncState::add(
+                            let _ = SyncStateDAO::insert(&mut SyncState::new(
                                 SyncStateType::File,
                                 SyncStateAction::Move,
                                 file.id.unwrap(),
                                 Some(file.parent_id),
                                 file.user_id,
-                            ));
+                            ))
+                            .await?;
                         } else {
                             return Err(actix_web::error::ErrorBadRequest(
                                 "There is already a file with the given name in the new directory",

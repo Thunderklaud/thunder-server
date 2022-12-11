@@ -60,13 +60,14 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
                 DirectoryDAO::add_child_by_oid(parent_id, id, dir.user_id).await?;
             }
 
-            let _ = SyncStateDAO::insert(&mut SyncState::add(
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
                 SyncStateType::Directory,
                 SyncStateAction::Create,
                 id,
                 dir.parent_id,
                 dir.user_id,
-            ));
+            ))
+            .await?;
 
             return Ok(id);
         }
@@ -245,13 +246,14 @@ impl DirectoryDAO {
             ));
         }
 
-        let _ = SyncStateDAO::insert(&mut SyncState::add(
+        let _ = SyncStateDAO::insert(&mut SyncState::new(
             SyncStateType::Directory,
             SyncStateAction::Rename,
             dir.id.unwrap(),
             dir.parent_id,
             dir.user_id,
-        ));
+        ))
+        .await?;
 
         Ok(())
     }
@@ -309,13 +311,14 @@ impl DirectoryDAO {
             // remove child id from old parent
             DirectoryDAO::remove_child_by_oid(parent_id, id, dir.user_id).await?;
 
-            let _ = SyncStateDAO::insert(&mut SyncState::add(
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
                 SyncStateType::Directory,
                 SyncStateAction::Move,
                 id,
                 dir.parent_id,
                 dir.user_id,
-            ));
+            ))
+            .await?;
 
             dir.parent_id = Some(new_parent_oid);
             return Ok(());

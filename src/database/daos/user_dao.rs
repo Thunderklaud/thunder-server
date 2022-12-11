@@ -41,13 +41,14 @@ impl DAO<User, ObjectId> for UserDAO {
 
         user.id = insert_result.inserted_id.as_object_id();
         if let Some(id) = user.id {
-            let _ = SyncStateDAO::insert(&mut SyncState::add(
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
                 SyncStateType::User,
                 SyncStateAction::Create,
                 id,
                 None,
                 id,
-            ));
+            ))
+            .await?;
 
             return Ok(id);
         }

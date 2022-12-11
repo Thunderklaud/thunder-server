@@ -50,7 +50,7 @@ impl SyncState {
             SyncStateAction::Delete => "delete".to_string(),
         }
     }
-    pub fn add(
+    pub fn new(
         state_type: SyncStateType,
         state_action: SyncStateAction,
         corresponding_id: ObjectId,
