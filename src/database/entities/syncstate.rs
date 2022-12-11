@@ -21,6 +21,11 @@ impl MyDBModel for SyncState {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SyncStateGet {
+    pub since: DateTime,
+}
+
 pub enum SyncStateType {
     Directory,
     File,

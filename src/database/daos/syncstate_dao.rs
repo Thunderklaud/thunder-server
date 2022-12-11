@@ -1,9 +1,13 @@
+use std::borrow::Borrow;
+
+use async_trait::async_trait;
+use futures_util::StreamExt;
+use mongodb::bson::oid::ObjectId;
+use mongodb::bson::{doc, DateTime};
+use mongodb::options::FindOptions;
+
 use crate::database::daos::dao::DAO;
 use crate::database::entities::syncstate::SyncState;
-use async_trait::async_trait;
-use mongodb::bson::doc;
-use mongodb::bson::oid::ObjectId;
-use std::borrow::Borrow;
 
 pub struct SyncStateDAO {}
 
@@ -71,5 +75,34 @@ impl SyncStateDAO {
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
         Ok(())
+    }
+
+    pub async fn get_since_for_user(
+        since: DateTime,
+        user_id: ObjectId,
+    ) -> actix_web::Result<Vec<SyncState>> {
+        let mut states: Vec<SyncState> = Vec::new();
+        let find_options = FindOptions::builder()
+            .min(doc! { "creation_date": since })
+            .build();
+
+        let mut cursor = Self::get_collection()
+            .await
+            .find(
+                doc! {
+                    "user_id": user_id
+                },
+                find_options,
+            )
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        while let Some(state) = cursor.next().await {
+            if let Ok(state) = state {
+                states.push(state);
+            }
+        }
+
+        Ok(states)
     }
 }
