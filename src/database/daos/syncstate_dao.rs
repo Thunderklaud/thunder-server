@@ -1,14 +1,9 @@
 use crate::database::daos::dao::DAO;
-use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
-use crate::database::entities::user::User;
-use crate::jwt_utils::extract_user_oid;
-use crate::Claims;
-use actix_jwt_authc::Authenticated;
+use crate::database::entities::syncstate::SyncState;
 use async_trait::async_trait;
+use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
-use mongodb::bson::{doc, DateTime};
 use std::borrow::Borrow;
-use tracing::{event, Level};
 
 pub struct SyncStateDAO {}
 

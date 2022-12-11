@@ -2,8 +2,6 @@ use crate::database::database::MyDBModel;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::error::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncState {
@@ -36,21 +34,12 @@ pub enum SyncStateAction {
 }
 
 impl SyncState {
-    fn set_type(&mut self, new_type: SyncStateType) {
-        self.r#type = SyncState::get_type_match(new_type);
-    }
     fn get_type_match(state_type: SyncStateType) -> String {
         match state_type {
             SyncStateType::Directory => "Directory".to_string(),
             SyncStateType::File => "File".to_string(),
             SyncStateType::User => "User".to_string(),
         }
-    }
-    fn get_type_str(&self) -> &str {
-        self.r#type.as_str()
-    }
-    fn set_action(&mut self, new_action: SyncStateAction) {
-        self.r#type = SyncState::get_action_match(new_action);
     }
     fn get_action_match(state_action: SyncStateAction) -> String {
         match state_action {
@@ -59,9 +48,6 @@ impl SyncState {
             SyncStateAction::Move => "move".to_string(),
             SyncStateAction::Delete => "delete".to_string(),
         }
-    }
-    fn get_action_str(&self) -> &str {
-        self.action.as_str()
     }
     pub fn add(
         state_type: SyncStateType,
