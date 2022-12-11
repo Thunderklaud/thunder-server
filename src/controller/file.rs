@@ -140,6 +140,7 @@ pub async fn update(
                             SyncStateType::File,
                             SyncStateAction::Create,
                             file.id.unwrap(),
+                            Some(file.parent_id),
                             file.user_id,
                         ));
                     } else {
@@ -167,6 +168,7 @@ pub async fn update(
                                 SyncStateType::File,
                                 SyncStateAction::Move,
                                 file.id.unwrap(),
+                                Some(file.parent_id),
                                 file.user_id,
                             ));
                         } else {

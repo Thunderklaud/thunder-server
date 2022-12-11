@@ -9,6 +9,7 @@ pub struct SyncState {
     pub id: Option<ObjectId>,
     pub user_id: ObjectId,
     pub corresponding_id: ObjectId,
+    pub corresponding_parent_id: Option<ObjectId>,
     r#type: String,
     action: String,
     pub creation_date: DateTime,
@@ -53,12 +54,14 @@ impl SyncState {
         state_type: SyncStateType,
         state_action: SyncStateAction,
         corresponding_id: ObjectId,
+        corresponding_parent_id: Option<ObjectId>,
         user_id: ObjectId,
     ) -> SyncState {
         SyncState {
             id: None,
             user_id,
             corresponding_id,
+            corresponding_parent_id,
             r#type: SyncState::get_type_match(state_type),
             action: SyncState::get_action_match(state_action),
             creation_date: DateTime::now(),

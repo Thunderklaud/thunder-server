@@ -45,6 +45,7 @@ impl DAO<User, ObjectId> for UserDAO {
                 SyncStateType::User,
                 SyncStateAction::Create,
                 id,
+                None,
                 id,
             ));
 

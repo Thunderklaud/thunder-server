@@ -64,6 +64,7 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
                 SyncStateType::Directory,
                 SyncStateAction::Create,
                 id,
+                dir.parent_id,
                 dir.user_id,
             ));
 
@@ -248,6 +249,7 @@ impl DirectoryDAO {
             SyncStateType::Directory,
             SyncStateAction::Rename,
             dir.id.unwrap(),
+            dir.parent_id,
             dir.user_id,
         ));
 
@@ -311,6 +313,7 @@ impl DirectoryDAO {
                 SyncStateType::Directory,
                 SyncStateAction::Move,
                 id,
+                dir.parent_id,
                 dir.user_id,
             ));
 

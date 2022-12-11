@@ -55,6 +55,7 @@ impl DAO<File, ObjectId> for FileDAO {
                 SyncStateType::File,
                 SyncStateAction::Create,
                 id,
+                Some(file.parent_id),
                 file.user_id,
             ));
 
@@ -115,6 +116,7 @@ impl DAO<File, ObjectId> for FileDAO {
                 SyncStateType::File,
                 SyncStateAction::Delete,
                 id,
+                Some(file.parent_id),
                 file.user_id,
             ));
 
