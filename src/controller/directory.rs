@@ -43,9 +43,7 @@ pub async fn create(
         child_ids: vec![],
     };
 
-    let dir_detail = DirectoryDAO::insert(&mut dir)
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    let dir_detail = DirectoryDAO::insert(&mut dir).await?;
     Ok(HttpResponse::Ok().json(dir_detail))
 }
 
@@ -73,8 +71,7 @@ pub async fn update(
             extract_object_id(Some(parent_id), _authenticated.claims.thunder_root_dir_id)?,
             _authenticated.borrow(),
         )
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        .await?;
     }
 
     if let Some(name) = &dir_post_data.name {
@@ -84,19 +81,7 @@ pub async fn update(
             ));
         }
 
-        dir.name = name.to_string();
-
-        let update_result = DirectoryDAO::update(&mut dir).await?;
-        if update_result <= 0 {
-            event!(
-                Level::DEBUG,
-                "renaming directory failed {:?}",
-                update_result
-            );
-            return Err(actix_web::error::ErrorInternalServerError(
-                "Renaming directory failed",
-            ));
-        }
+        DirectoryDAO::rename(&mut dir, name).await?;
     }
 
     Ok(HttpResponse::Ok().finish())

@@ -1,4 +1,6 @@
 use crate::database::daos::dao::DAO;
+use crate::database::daos::syncstate_dao::SyncStateDAO;
+use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
 use crate::database::entities::user::User;
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
@@ -39,6 +41,15 @@ impl DAO<User, ObjectId> for UserDAO {
 
         user.id = insert_result.inserted_id.as_object_id();
         if let Some(id) = user.id {
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
+                SyncStateType::User,
+                SyncStateAction::Create,
+                id,
+                None,
+                id,
+            ))
+            .await?;
+
             return Ok(id);
         }
 

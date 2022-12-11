@@ -14,9 +14,11 @@ use mongodb::bson::{DateTime, Uuid};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
+use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::file::{
     File, FilePatch, GetSingleQueryParams, MultiUploadQueryParams,
 };
+use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
 use crate::jwt_utils::extract_user_oid;
 use crate::storage::storage_provider::StorageProvider;
 use crate::Claims;
@@ -133,6 +135,15 @@ pub async fn update(
                     if !dir.has_file_with_name(&new_name).await {
                         file.name = (*new_name).clone();
                         changed = true;
+
+                        let _ = SyncStateDAO::insert(&mut SyncState::new(
+                            SyncStateType::File,
+                            SyncStateAction::Rename,
+                            file.id.unwrap(),
+                            Some(file.parent_id),
+                            file.user_id,
+                        ))
+                        .await?;
                     } else {
                         return Err(actix_web::error::ErrorBadRequest(
                             "There is already a file with the given name in the current directory",
@@ -153,6 +164,15 @@ pub async fn update(
                         if !new_directory.has_file_with_name(&file.name).await {
                             file.parent_id = new_directory_oid;
                             changed = true;
+
+                            let _ = SyncStateDAO::insert(&mut SyncState::new(
+                                SyncStateType::File,
+                                SyncStateAction::Move,
+                                file.id.unwrap(),
+                                Some(file.parent_id),
+                                file.user_id,
+                            ))
+                            .await?;
                         } else {
                             return Err(actix_web::error::ErrorBadRequest(
                                 "There is already a file with the given name in the new directory",
