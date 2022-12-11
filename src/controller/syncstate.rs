@@ -1,5 +1,6 @@
 use actix_jwt_authc::Authenticated;
 use actix_web::{web, HttpResponse};
+use mongodb::bson::DateTime;
 
 use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::syncstate::SyncStateGet;
@@ -11,7 +12,7 @@ pub async fn get(
     syncstate_get_data: web::Query<SyncStateGet>,
 ) -> actix_web::Result<HttpResponse> {
     let states = SyncStateDAO::get_since_for_user(
-        syncstate_get_data.since,
+        DateTime::from_millis(syncstate_get_data.since),
         extract_user_oid(&_authenticated),
     )
     .await?;
