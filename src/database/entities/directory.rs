@@ -44,6 +44,11 @@ pub struct DirectoryGet {
     pub id: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DirectoryDelete {
+    pub id: String,
+}
+
 #[derive(Serialize)]
 pub struct DirectoryGetResponse {
     pub dirs: Vec<MinimalDirectoryObject>,

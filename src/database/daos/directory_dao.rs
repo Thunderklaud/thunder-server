@@ -1,18 +1,23 @@
-use crate::database::daos::dao::DAO;
-use crate::database::daos::syncstate_dao::SyncStateDAO;
-use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
-use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
-use crate::jwt_utils::extract_user_oid;
-use crate::Claims;
+use std::borrow::Borrow;
+
 use actix_jwt_authc::Authenticated;
 use async_trait::async_trait;
 use futures::StreamExt;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
-use std::borrow::Borrow;
 use tracing::{event, Level};
 
+use crate::database::daos::dao::DAO;
+use crate::database::daos::file_dao::FileDAO;
+use crate::database::daos::syncstate_dao::SyncStateDAO;
+use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
+use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
+use crate::jwt_utils::extract_user_oid;
+use crate::storage::storage_provider::StorageProvider;
+use crate::Claims;
+
 static ROOT_DIR_NAME: &str = "/";
+
 pub struct DirectoryDAO {}
 
 #[async_trait]
@@ -104,8 +109,42 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
         ))
     }
 
-    async fn delete(_: &Directory) -> actix_web::Result<u64> {
-        todo!()
+    async fn delete(dir: &Directory) -> actix_web::Result<u64> {
+        if let Some(id) = dir.id {
+            for file in dir.get_files().await {
+                StorageProvider::delete_file(file.uuid.clone())?;
+                FileDAO::delete(&file).await?;
+            }
+
+            let delete_result = Self::get_collection()
+                .await
+                .delete_one(
+                    doc! {
+                        "_id": id
+                    },
+                    None,
+                )
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+            SyncStateDAO::delete_for_corresponding_id(id).await?;
+            SyncStateDAO::delete_for_corresponding_parent_id(id).await?;
+
+            let _ = SyncStateDAO::insert(&mut SyncState::new(
+                SyncStateType::Directory,
+                SyncStateAction::Delete,
+                id,
+                dir.parent_id,
+                dir.user_id,
+            ))
+            .await?;
+
+            return Ok(delete_result.deleted_count);
+        }
+
+        Err(actix_web::error::ErrorInternalServerError(
+            "directory id not found",
+        ))
     }
 }
 
