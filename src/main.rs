@@ -47,13 +47,10 @@ async fn main() -> Result<()> {
 
     // cmd here
     let args: Vec<String> = env::args().collect();
-    let mut opts = getopt::Parser::new(&args, "ra:u:h");
+    let mut opts = getopt::Parser::new(&args, "ra:u:sh");
     let mut run_server_after_cmd_execution = false;
 
     if args.len() <= 1 {
-        // Print out our settings
-        println!("{:#?}", SETTINGS);
-
         run_server_after_cmd_execution = true;
     }
 
@@ -70,6 +67,10 @@ async fn main() -> Result<()> {
                 Opt('u', Some(string)) => update_user_role(string.clone(), Role::BaseUser)
                     .await
                     .unwrap(),
+                Opt('s', None) => {
+                    // Print out our settings
+                    println!("{:#?}", SETTINGS);
+                }
                 Opt('h', None) => {
                     print_help();
                     return Ok(());
@@ -148,6 +149,7 @@ fn print_help() {
     );
     println!("-a id     add administrator role to user by id");
     println!("-u id     remove administrator role from user by id");
+    println!("-s        print loaded server settings");
     println!("-h        print this help block");
 }
 
