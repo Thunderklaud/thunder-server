@@ -1,3 +1,5 @@
+use crate::cmd::update_user_role;
+use crate::database::entities::user::Role;
 use crate::jwt_utils::{
     get_auth_middleware_settings, get_jwt_ttl, Claims, InvalidatedJWTStore, JwtSigningKeys,
 };
@@ -6,12 +8,16 @@ use actix_jwt_authc::AuthenticateMiddlewareFactory;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
 use anyhow::Result;
+use getopt::Opt;
 use once_cell::sync::OnceCell;
+use std::env;
+use std::process::exit;
 use tracing::level_filters::LevelFilter;
 use tracing::{event, Level};
 
 extern crate strum_macros;
 
+mod cmd;
 mod controller;
 mod database;
 mod jwt_utils;
@@ -37,10 +43,48 @@ async fn main() -> Result<()> {
 
     event!(Level::INFO, "tracing_subscriber initialized in main");
 
-    // Print out our settings
-    println!("{:#?}", SETTINGS);
-
     StorageProvider::init(settings)?;
+
+    // cmd here
+    let args: Vec<String> = env::args().collect();
+    let mut opts = getopt::Parser::new(&args, "ra:u:h");
+    let mut run_server_after_cmd_execution = false;
+
+    if args.len() <= 1 {
+        // Print out our settings
+        println!("{:#?}", SETTINGS);
+
+        run_server_after_cmd_execution = true;
+    }
+
+    loop {
+        match opts.next().transpose()? {
+            None => {
+                break;
+            }
+            Some(opt) => match opt {
+                Opt('r', None) => run_server_after_cmd_execution = true,
+                Opt('a', Some(string)) => {
+                    update_user_role(string.clone(), Role::Admin).await.unwrap()
+                }
+                Opt('u', Some(string)) => update_user_role(string.clone(), Role::BaseUser)
+                    .await
+                    .unwrap(),
+                Opt('h', None) => {
+                    print_help();
+                    return Ok(());
+                }
+                _ => {
+                    print_help();
+                    return Ok(());
+                }
+            },
+        }
+    }
+
+    if !run_server_after_cmd_execution {
+        exit(0);
+    }
 
     let jwt_signing_keys = if (&settings).jwt_secret.len() > 20 {
         JwtSigningKeys::parse((&settings).jwt_secret.as_str()).unwrap()
@@ -93,6 +137,18 @@ async fn main() -> Result<()> {
     .run()
     .await
     .map_err(anyhow::Error::from)
+}
+
+fn print_help() {
+    println!("Run command without options to start run server");
+
+    println!("Command line options:");
+    println!(
+        "-r        run server after cmd execution (default: false = stop after cmd execution)"
+    );
+    println!("-a id     add administrator role to user by id");
+    println!("-u id     remove administrator role from user by id");
+    println!("-h        print this help block");
 }
 
 #[cfg(test)]
