@@ -1,5 +1,6 @@
 verbose = 0
 debug = false
+enable_public_registration = false
 
 [server]
 port = "8080"

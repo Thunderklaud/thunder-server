@@ -15,7 +15,7 @@ use crate::database::entities::user::{
     LoginResponse, LogoutResponse, Role, User, UserLogin, UserRegister,
 };
 use crate::jwt_utils::{JWTTtl, JWT_SIGNING_ALGO};
-use crate::{Claims, InvalidatedJWTStore};
+use crate::{Claims, InvalidatedJWTStore, SETTINGS};
 
 #[derive(Serialize)]
 pub struct TestResponse {
@@ -85,6 +85,14 @@ pub async fn logout(
 }
 
 pub async fn register(new_user: Json<UserRegister>) -> actix_web::Result<HttpResponse> {
+    let settings = SETTINGS.get().unwrap();
+
+    if !settings.enable_public_registration {
+        return Err(actix_web::error::ErrorForbidden(
+            "Public registration is disabled at the moment",
+        ));
+    }
+
     if !User::is_valid_hash_design(new_user.pw_hash.to_owned().as_str()) {
         // not a hex encoded hash or less than 256 bit size
         return Err(actix_web::error::ErrorExpectationFailed(

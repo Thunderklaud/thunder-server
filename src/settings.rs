@@ -27,6 +27,7 @@ pub struct Settings {
     pub server: Server,
     pub jwt_secret: String,
     pub upload_path: String,
+    pub enable_public_registration: bool,
 }
 
 impl Settings {
