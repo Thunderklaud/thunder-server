@@ -66,22 +66,31 @@ pub async fn update(
             parent_id
         );
 
-        DirectoryDAO::move_to(
-            &mut dir,
-            extract_object_id(Some(parent_id), _authenticated.claims.thunder_root_dir_id)?,
-            _authenticated.borrow(),
-        )
-        .await?;
+        let new_parent_oid =
+            extract_object_id(Some(parent_id), _authenticated.claims.thunder_root_dir_id)?;
+
+        // do not move, if a rename after moving is requested, but not possible
+        if let Some(name) = &dir_post_data.name {
+            if DirectoryDAO::dir_by_name_exists_in(name, new_parent_oid).await? {
+                return Err(actix_web::error::ErrorForbidden(
+                    "A directory with that name already exists in the destination",
+                ));
+            }
+        }
+
+        DirectoryDAO::move_to(&mut dir, new_parent_oid, _authenticated.borrow()).await?;
     }
 
     if let Some(name) = &dir_post_data.name {
-        if name.is_empty() {
-            return Err(actix_web::error::ErrorBadRequest(
-                "Directory name cannot be empty",
-            ));
-        }
+        if !dir.name.eq(name) {
+            if name.is_empty() {
+                return Err(actix_web::error::ErrorBadRequest(
+                    "Directory name cannot be empty",
+                ));
+            }
 
-        DirectoryDAO::rename(&mut dir, name).await?;
+            DirectoryDAO::rename(&mut dir, name).await?;
+        }
     }
 
     Ok(HttpResponse::Ok().finish())

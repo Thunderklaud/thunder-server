@@ -53,6 +53,12 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
     }
 
     async fn insert(dir: &mut Directory) -> actix_web::Result<ObjectId> {
+        if Self::dir_by_name_exists_in(&dir.name, dir.parent_id.unwrap()).await? {
+            return Err(actix_web::error::ErrorForbidden(
+                "A directory with that name already exists in this folder",
+            ));
+        }
+
         let insert_result = DirectoryDAO::get_collection()
             .await
             .insert_one(dir.borrow(), None)
@@ -175,6 +181,28 @@ impl DirectoryDAO {
         Ok(dir_names)
     }
 
+    pub async fn dir_by_name_exists_in(
+        name: &String,
+        parent_id: ObjectId,
+    ) -> actix_web::Result<bool> {
+        let dir = DirectoryDAO::get_collection()
+            .await
+            .find_one(
+                doc! {
+                    "name": name,
+                    "parent_id": parent_id
+                },
+                None,
+            )
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        Ok(match dir {
+            Some(_) => true,
+            _ => false,
+        })
+    }
+
     pub async fn create_user_root_dir(user_id: ObjectId) -> actix_web::Result<ObjectId> {
         let dir = DirectoryDAO::get_collection()
             .await
@@ -271,6 +299,12 @@ impl DirectoryDAO {
     }
 
     pub async fn rename(dir: &mut Directory, new_name: &String) -> actix_web::Result<()> {
+        if Self::dir_by_name_exists_in(&new_name, dir.parent_id.unwrap()).await? {
+            return Err(actix_web::error::ErrorForbidden(
+                "A directory with that name already exists in this folder",
+            ));
+        }
+
         dir.name = new_name.to_string();
 
         let update_result = DirectoryDAO::update(dir).await?;
@@ -326,6 +360,12 @@ impl DirectoryDAO {
                         "no permission to access the requested parent directory",
                     )
                 })?;
+
+            if Self::dir_by_name_exists_in(&dir.name, new_parent_oid).await? {
+                return Err(actix_web::error::ErrorForbidden(
+                    "A directory with that name already exists in the destination",
+                ));
+            }
 
             // give dir the new parent id
             DirectoryDAO::get_collection()
