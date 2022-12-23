@@ -12,6 +12,7 @@ use tracing::{event, Level};
 
 extern crate strum_macros;
 
+mod cmd;
 mod controller;
 mod database;
 mod jwt_utils;
@@ -37,10 +38,9 @@ async fn main() -> Result<()> {
 
     event!(Level::INFO, "tracing_subscriber initialized in main");
 
-    // Print out our settings
-    println!("{:#?}", SETTINGS);
-
     StorageProvider::init(settings)?;
+
+    cmd::process().await;
 
     let jwt_signing_keys = if (&settings).jwt_secret.len() > 20 {
         JwtSigningKeys::parse((&settings).jwt_secret.as_str()).unwrap()
