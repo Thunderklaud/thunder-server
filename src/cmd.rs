@@ -25,6 +25,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Manage users
+    #[command(arg_required_else_help(true))]
     User {
         /// lists registered users
         #[arg(short, long)]
