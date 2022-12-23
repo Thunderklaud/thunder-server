@@ -1,5 +1,6 @@
 verbose = 3
 debug = true
+enable_public_registration = true
 
 [server]
 port = "8000"
