@@ -53,10 +53,12 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
     }
 
     async fn insert(dir: &mut Directory) -> actix_web::Result<ObjectId> {
-        if Self::dir_by_name_exists_in(&dir.name, dir.parent_id.unwrap()).await? {
-            return Err(actix_web::error::ErrorForbidden(
-                "A directory with that name already exists in this folder",
-            ));
+        if let Some(parent_id) = dir.parent_id {
+            if Self::dir_by_name_exists_in(&dir.name, parent_id).await? {
+                return Err(actix_web::error::ErrorForbidden(
+                    "A directory with that name already exists in this folder",
+                ));
+            }
         }
 
         let insert_result = DirectoryDAO::get_collection()
