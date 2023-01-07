@@ -93,6 +93,10 @@ async fn main() -> Result<()> {
                             .route(
                                 "/file",
                                 web::post().to(controller::share::create_file_share),
+                            )
+                            .route(
+                                "/file",
+                                web::get().to(controller::share::get_share_infos_for_file),
                             ),
                     ),
             )
