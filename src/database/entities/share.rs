@@ -38,7 +38,7 @@ pub struct FileShareCreate {
     pub uuid: String,
     pub label: String,
     pub max_dl_count: Option<u32>, // max. 4294967295 with u32
-    pub valid_until: Option<DateTime>,
+    pub valid_until: Option<i64>,  // timestamp with milliseconds
 }
 
 pub enum ShareType {
@@ -68,7 +68,7 @@ impl Share {
         user_id: ObjectId,
         label: String,
         max_dl_count: Option<u32>,
-        valid_until: Option<DateTime>,
+        valid_until: Option<i64>,
     ) -> Share {
         Share {
             id: None,
@@ -78,7 +78,10 @@ impl Share {
             label,
             max_dl_count,
             current_dl_count: 0_u32,
-            valid_until,
+            valid_until: match valid_until {
+                Some(until) => Some(DateTime::from_millis(until)),
+                _ => None,
+            },
             creation_date: DateTime::now(),
         }
     }
