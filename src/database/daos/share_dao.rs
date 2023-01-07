@@ -130,22 +130,6 @@ impl ShareDAO {
         Ok(())
     }
 
-    pub async fn delete_for_corresponding_parent_id(
-        corresponding_parent_id: ObjectId,
-    ) -> actix_web::error::Result<()> {
-        Self::get_collection()
-            .await
-            .delete_many(
-                doc! {
-                    "corresponding_parent_id": corresponding_parent_id
-                },
-                None,
-            )
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-        Ok(())
-    }
-
     pub async fn get_all_for_user(user_id: ObjectId) -> actix_web::Result<Vec<Share>> {
         let mut shares: Vec<Share> = Vec::new();
 
