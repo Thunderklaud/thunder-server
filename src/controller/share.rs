@@ -5,6 +5,7 @@ use actix_web::{web, HttpResponse};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::share_dao::ShareDAO;
+use crate::database::entities::file::GetSingleQueryParams;
 use crate::database::entities::share::{FileShareCreate, Share, ShareDelete, ShareGet, ShareType};
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
@@ -22,14 +23,20 @@ pub async fn get_share_info(
 }
 
 pub async fn get_share_infos_for_file(
-    share_get_data: web::Query<ShareGet>,
+    _authenticated: Authenticated<Claims>,
+    share_get_data: web::Query<GetSingleQueryParams>,
 ) -> actix_web::Result<HttpResponse> {
-    if let Ok(shares) = ShareDAO::get_all_for_corresponding_id(share_get_data.id).await {
-        return Ok(HttpResponse::Ok().json(shares));
+    if let Some(file) =
+        FileDAO::get_file_by_uuid_for_user(&share_get_data.uuid, extract_user_oid(&_authenticated))
+            .await?
+    {
+        if let Ok(shares) = ShareDAO::get_all_for_corresponding_id(file.id.unwrap()).await {
+            return Ok(HttpResponse::Ok().json(shares));
+        }
     }
 
     Err(actix_web::error::ErrorBadRequest(
-        "Requested shares could not be found",
+        "Requested file or shares could not be found",
     ))
 }
 
