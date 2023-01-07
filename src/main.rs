@@ -85,6 +85,14 @@ async fn main() -> Result<()> {
                                 web::scope("/download")
                                     .route("/file", web::get().to(controller::file::get_single)),
                             ),
+                    )
+                    .service(
+                        web::scope("/share")
+                            .route("/", web::get().to(controller::share::get_share_info))
+                            .route(
+                                "/file",
+                                web::post().to(controller::share::create_file_share),
+                            ),
                     ),
             )
     })
