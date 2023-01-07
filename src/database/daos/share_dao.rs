@@ -25,8 +25,18 @@ impl DAO<Share, ObjectId> for ShareDAO {
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
-    async fn get_with_user(_: ObjectId, _user_id: ObjectId) -> actix_web::Result<Option<Share>> {
-        unimplemented!()
+    async fn get_with_user(oid: ObjectId, user_id: ObjectId) -> actix_web::Result<Option<Share>> {
+        Self::get_collection()
+            .await
+            .find_one(
+                doc! {
+                    "_id": oid,
+                    "user_id": user_id
+                },
+                None,
+            )
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))
     }
 
     async fn insert(share: &mut Share) -> actix_web::Result<ObjectId> {
@@ -50,8 +60,25 @@ impl DAO<Share, ObjectId> for ShareDAO {
         unimplemented!()
     }
 
-    async fn delete(_: &Share) -> actix_web::Result<u64> {
-        todo!()
+    async fn delete(share: &Share) -> actix_web::Result<u64> {
+        if let Some(id) = share.id {
+            let delete_result = Self::get_collection()
+                .await
+                .delete_one(
+                    doc! {
+                        "_id": id
+                    },
+                    None,
+                )
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+            return Ok(delete_result.deleted_count);
+        }
+
+        Err(actix_web::error::ErrorInternalServerError(
+            "share id not found",
+        ))
     }
 }
 

@@ -5,7 +5,7 @@ use actix_web::{web, HttpResponse};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::share_dao::ShareDAO;
-use crate::database::entities::share::{FileShareCreate, Share, ShareGet, ShareType};
+use crate::database::entities::share::{FileShareCreate, Share, ShareDelete, ShareGet, ShareType};
 use crate::jwt_utils::extract_user_oid;
 use crate::Claims;
 
@@ -45,5 +45,21 @@ pub async fn create_file_share(
 
     Err(actix_web::error::ErrorBadRequest(
         "Requested file could not be found",
+    ))
+}
+
+pub async fn delete_share(
+    _authenticated: Authenticated<Claims>,
+    delete_share_data: web::Query<ShareDelete>,
+) -> actix_web::Result<HttpResponse> {
+    if let Some(share) =
+        ShareDAO::get_with_user(delete_share_data.id, extract_user_oid(&_authenticated)).await?
+    {
+        ShareDAO::delete(&share).await?;
+        return Ok(HttpResponse::Ok().finish());
+    }
+
+    Err(actix_web::error::ErrorBadRequest(
+        "Requested share could not be found",
     ))
 }

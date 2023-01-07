@@ -89,6 +89,7 @@ async fn main() -> Result<()> {
                     .service(
                         web::scope("/share")
                             .route("/", web::get().to(controller::share::get_share_info))
+                            .route("/", web::delete().to(controller::share::delete_share))
                             .route(
                                 "/file",
                                 web::post().to(controller::share::create_file_share),

@@ -30,6 +30,11 @@ pub struct ShareGet {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ShareDelete {
+    pub id: ObjectId,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileShareCreate {
     pub uuid: String,
     pub label: String,
