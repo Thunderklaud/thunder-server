@@ -78,6 +78,18 @@ pub async fn get_share_infos_for_file(
     ))
 }
 
+pub async fn get_share_infos_for_user(
+    _authenticated: Authenticated<Claims>,
+) -> actix_web::Result<HttpResponse> {
+    if let Ok(shares) = ShareDAO::get_all_for_user(extract_user_oid(&_authenticated)).await {
+        return Ok(HttpResponse::Ok().json(shares));
+    }
+
+    Err(actix_web::error::ErrorBadRequest(
+        "Requested shares could not be found",
+    ))
+}
+
 pub async fn create_file_share(
     _authenticated: Authenticated<Claims>,
     create_share_data: Json<FileShareCreate>,

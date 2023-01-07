@@ -67,7 +67,11 @@ async fn main() -> Result<()> {
                             .route("/logout", web::post().to(controller::user::logout))
                             .route("/registration", web::post().to(controller::user::register))
                             .route("/test", web::get().to(controller::user::test))
-                            .route("/syncstate", web::get().to(controller::syncstate::get)),
+                            .route("/syncstate", web::get().to(controller::syncstate::get))
+                            .route(
+                                "/shares",
+                                web::get().to(controller::share::get_share_infos_for_user),
+                            ),
                     )
                     .service(
                         web::scope("/data")
