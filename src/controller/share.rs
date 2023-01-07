@@ -44,7 +44,6 @@ pub async fn create_file_share(
         let mut share = Share::new(
             ShareType::File,
             file.id.unwrap(),
-            file.parent_id,
             user_id,
             create_share_data.label.to_string(),
             create_share_data.max_dl_count,

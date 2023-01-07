@@ -9,7 +9,6 @@ pub struct Share {
     pub id: Option<ObjectId>,
     pub user_id: ObjectId,
     pub corresponding_id: ObjectId,
-    pub corresponding_parent_id: ObjectId,
     r#type: String,
     label: String,
     pub max_dl_count: Option<u32>, // max. 4294967295 with u32
@@ -57,7 +56,6 @@ impl Share {
     pub fn new(
         state_type: ShareType,
         corresponding_id: ObjectId,
-        corresponding_parent_id: ObjectId,
         user_id: ObjectId,
         label: String,
         max_dl_count: Option<u32>,
@@ -67,7 +65,6 @@ impl Share {
             id: None,
             user_id,
             corresponding_id,
-            corresponding_parent_id,
             r#type: Share::get_type_match(state_type),
             label,
             max_dl_count,

@@ -9,6 +9,7 @@ use tracing::{event, Level};
 
 use crate::database::daos::dao::DAO;
 use crate::database::daos::file_dao::FileDAO;
+use crate::database::daos::share_dao::ShareDAO;
 use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
 use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
@@ -123,6 +124,8 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
                 StorageProvider::delete_file(file.uuid.clone())?;
                 FileDAO::delete(&file).await?;
             }
+
+            ShareDAO::delete_for_corresponding_id(id).await?;
 
             let delete_result = Self::get_collection()
                 .await

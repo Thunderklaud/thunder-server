@@ -1,11 +1,12 @@
-use futures::StreamExt;
 use std::borrow::Borrow;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{doc, DateTime};
 
 use crate::database::daos::dao::DAO;
+use crate::database::daos::share_dao::ShareDAO;
 use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::file::File;
 use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
@@ -102,6 +103,8 @@ impl DAO<File, ObjectId> for FileDAO {
 
     async fn delete(file: &File) -> actix_web::Result<u64> {
         if let Some(id) = file.id {
+            ShareDAO::delete_for_corresponding_id(id).await?;
+
             let delete_result = Self::get_collection()
                 .await
                 .delete_one(
