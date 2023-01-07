@@ -56,8 +56,32 @@ impl DAO<Share, ObjectId> for ShareDAO {
         ))
     }
 
-    async fn update(_: &Share) -> actix_web::Result<u64> {
-        unimplemented!()
+    async fn update(share: &Share) -> actix_web::Result<u64> {
+        if let Some(id) = share.id {
+            let update_result = Self::get_collection()
+                .await
+                .update_one(
+                    doc! {
+                        "_id": id
+                    },
+                    doc! {
+                        "$set": {
+                            "label": share.label.to_owned(),
+                            "max_dl_count": share.max_dl_count.to_owned(),
+                            "current_dl_count": share.current_dl_count.to_owned(),
+                            "valid_until": share.valid_until.to_owned(),
+                        }
+                    },
+                    None,
+                )
+                .await
+                .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+            return Ok(update_result.modified_count);
+        }
+
+        Err(actix_web::error::ErrorInternalServerError(
+            "share id not found",
+        ))
     }
 
     async fn delete(share: &Share) -> actix_web::Result<u64> {
@@ -84,6 +108,12 @@ impl DAO<Share, ObjectId> for ShareDAO {
 
 // custom methods
 impl ShareDAO {
+    pub async fn register_share_download(share: &mut Share) -> actix_web::error::Result<()> {
+        share.current_dl_count += 1;
+        Self::update(&share).await?;
+        Ok(())
+    }
+
     pub async fn delete_for_corresponding_id(
         corresponding_id: ObjectId,
     ) -> actix_web::error::Result<()> {

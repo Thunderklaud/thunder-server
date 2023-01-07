@@ -1,6 +1,8 @@
+use actix_files::NamedFile;
 use actix_jwt_authc::Authenticated;
 use actix_web::web::Json;
 use actix_web::{web, HttpResponse};
+use mongodb::bson::DateTime;
 
 use crate::database::daos::dao::DAO;
 use crate::database::daos::file_dao::FileDAO;
@@ -8,6 +10,7 @@ use crate::database::daos::share_dao::ShareDAO;
 use crate::database::entities::file::GetSingleQueryParams;
 use crate::database::entities::share::{FileShareCreate, Share, ShareDelete, ShareGet, ShareType};
 use crate::jwt_utils::extract_user_oid;
+use crate::storage::storage_provider::StorageProvider;
 use crate::Claims;
 
 pub async fn get_share_info(
@@ -15,6 +18,41 @@ pub async fn get_share_info(
 ) -> actix_web::Result<HttpResponse> {
     if let Some(share) = ShareDAO::get(share_get_data.id).await? {
         return Ok(HttpResponse::Ok().json(share));
+    }
+
+    Err(actix_web::error::ErrorBadRequest(
+        "Requested share could not be found",
+    ))
+}
+
+pub async fn download(share_get_data: web::Query<ShareGet>) -> actix_web::Result<NamedFile> {
+    if let Some(mut share) = ShareDAO::get(share_get_data.id).await? {
+        if let Some(valid_until) = share.valid_until {
+            if valid_until < DateTime::now() {
+                return Err(actix_web::error::ErrorForbidden("Share expired"));
+            }
+        }
+
+        if let Some(max_dl_count) = share.max_dl_count {
+            if share.current_dl_count >= max_dl_count {
+                return Err(actix_web::error::ErrorForbidden("Max shares reached"));
+            }
+        }
+
+        return match share.get_type() {
+            ShareType::File => {
+                if let Some(file) = FileDAO::get(share.corresponding_id).await? {
+                    ShareDAO::register_share_download(&mut share).await?;
+                    return Ok(StorageProvider::get_named_file(&file)?);
+                }
+                Err(actix_web::error::ErrorInternalServerError(
+                    "Requested file could not be found",
+                ))
+            }
+            _ => Err(actix_web::error::ErrorInternalServerError(
+                "Share type download not supported yet",
+            )),
+        };
     }
 
     Err(actix_web::error::ErrorBadRequest(

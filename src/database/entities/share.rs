@@ -10,7 +10,7 @@ pub struct Share {
     pub user_id: ObjectId,
     pub corresponding_id: ObjectId,
     r#type: String,
-    label: String,
+    pub label: String,
     pub max_dl_count: Option<u32>, // max. 4294967295 with u32
     pub current_dl_count: u32,
     pub valid_until: Option<DateTime>,
@@ -44,6 +44,7 @@ pub struct FileShareCreate {
 pub enum ShareType {
     Directory,
     File,
+    NoneType,
 }
 
 impl Share {
@@ -51,6 +52,14 @@ impl Share {
         match state_type {
             ShareType::Directory => "Directory".to_string(),
             ShareType::File => "File".to_string(),
+            ShareType::NoneType => "NoneType".to_string(),
+        }
+    }
+    pub fn get_type(&self) -> ShareType {
+        match self.r#type.as_str() {
+            "File" => ShareType::File,
+            "Directory" => ShareType::Directory,
+            _ => ShareType::NoneType, // should really never happen!
         }
     }
     pub fn new(
