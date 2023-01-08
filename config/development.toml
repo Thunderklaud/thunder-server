@@ -1,6 +1,10 @@
 verbose = 3
 debug = true
 enable_public_registration = true
+allowed_cors_origins = [
+    "localhost", # allows requests from a local webserver
+    "null"  # allows local requests without webserver
+]
 
 [server]
 port = "8000"

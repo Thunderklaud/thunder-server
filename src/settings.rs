@@ -28,6 +28,7 @@ pub struct Settings {
     pub jwt_secret: String,
     pub upload_path: String,
     pub enable_public_registration: bool,
+    pub allowed_cors_origins: Vec<String>,
 }
 
 impl Settings {
