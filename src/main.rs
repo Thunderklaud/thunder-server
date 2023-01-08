@@ -67,7 +67,11 @@ async fn main() -> Result<()> {
                             .route("/logout", web::post().to(controller::user::logout))
                             .route("/registration", web::post().to(controller::user::register))
                             .route("/test", web::get().to(controller::user::test))
-                            .route("/syncstate", web::get().to(controller::syncstate::get)),
+                            .route("/syncstate", web::get().to(controller::syncstate::get))
+                            .route(
+                                "/shares",
+                                web::get().to(controller::share::get_share_infos_for_user),
+                            ),
                     )
                     .service(
                         web::scope("/data")
@@ -84,6 +88,20 @@ async fn main() -> Result<()> {
                             .service(
                                 web::scope("/download")
                                     .route("/file", web::get().to(controller::file::get_single)),
+                            ),
+                    )
+                    .service(
+                        web::scope("/share")
+                            .route("/", web::get().to(controller::share::get_share_info))
+                            .route("/", web::delete().to(controller::share::delete_share))
+                            .route("/download", web::get().to(controller::share::download))
+                            .route(
+                                "/file",
+                                web::post().to(controller::share::create_file_share),
+                            )
+                            .route(
+                                "/file",
+                                web::get().to(controller::share::get_share_infos_for_file),
                             ),
                     ),
             )

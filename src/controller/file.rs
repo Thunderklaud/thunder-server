@@ -7,7 +7,6 @@ use actix_multipart::Multipart;
 use actix_web::web::Json;
 use actix_web::{web, HttpRequest, HttpResponse};
 use futures_util::TryStreamExt;
-use mime::Mime;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
 
@@ -31,13 +30,7 @@ pub async fn get_single(
         FileDAO::get_file_by_uuid_for_user(&query_params.uuid, extract_user_oid(&_authenticated))
             .await?
     {
-        let mut named_file = NamedFile::open(StorageProvider::get_direct_file_path(file.uuid))?;
-
-        if let Ok(mime) = Mime::from_str(file.mime.as_str()) {
-            named_file = named_file.set_content_type(mime);
-        }
-
-        return Ok(named_file);
+        return Ok(StorageProvider::get_named_file(&file)?);
     }
 
     return Err(actix_web::error::ErrorBadRequest("File not found"));
