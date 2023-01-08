@@ -2,9 +2,10 @@ use crate::jwt_utils::{
     get_auth_middleware_settings, get_jwt_ttl, Claims, InvalidatedJWTStore, JwtSigningKeys,
 };
 use crate::storage::storage_provider::StorageProvider;
+use actix_cors::Cors;
 use actix_jwt_authc::AuthenticateMiddlewareFactory;
 use actix_web::web::Data;
-use actix_web::{web, App, HttpServer};
+use actix_web::{http, web, App, HttpServer};
 use anyhow::Result;
 use once_cell::sync::OnceCell;
 use tracing::level_filters::LevelFilter;
@@ -54,10 +55,31 @@ async fn main() -> Result<()> {
         AuthenticateMiddlewareFactory::<Claims>::new(stream, auth_middleware_settings.clone());
 
     HttpServer::new(move || {
+        let allowed_cors_origins = (&settings).allowed_cors_origins.clone();
+        let cors = Cors::default()
+            .allowed_origin_fn(move |origin, _req_head| {
+                let bytes_origin = origin.as_bytes();
+                allowed_cors_origins
+                    .iter()
+                    .any(|allowed_origin| bytes_origin.eq((*allowed_origin).as_bytes()))
+            })
+            .allowed_methods(vec!["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"])
+            .allowed_headers(vec![
+                http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                http::header::ACCEPT,
+                http::header::AUTHORIZATION,
+                http::header::CONTENT_TYPE,
+                http::header::VARY,
+            ])
+            .supports_credentials()
+            .max_age(60); // see https://fetch.spec.whatwg.org/#http-access-control-max-age
+
         App::new()
             .app_data(Data::new(invalidated_jwt_store.clone()))
             .app_data(Data::new(jwt_signing_keys.encoding_key.clone()))
             .app_data(Data::new(get_jwt_ttl()))
+            .wrap(cors)
             .wrap(auth_middleware_factory.clone())
             .service(
                 web::scope("/v1")

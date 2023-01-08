@@ -1,6 +1,7 @@
 verbose = 0
 debug = false
 enable_public_registration = false
+allowed_cors_origins = []
 
 [server]
 port = "8080"
