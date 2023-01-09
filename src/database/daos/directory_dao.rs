@@ -182,6 +182,7 @@ impl DirectoryDAO {
                     name: dir.name,
                     child_dir_count: dir.child_ids.len() as u64,
                     child_file_count: FileDAO::count_files_by_parent_id(dir.id.unwrap()).await?,
+                    creation_date_ts: dir.creation_date.timestamp_millis(),
                 });
             }
         }

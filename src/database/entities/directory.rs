@@ -61,6 +61,7 @@ pub struct DirectoryGetResponseObject {
     pub name: String,
     pub child_dir_count: u64,
     pub child_file_count: u64,
+    pub creation_date_ts: i64,
 }
 
 impl Directory {
