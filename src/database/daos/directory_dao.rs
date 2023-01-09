@@ -11,7 +11,7 @@ use crate::database::daos::dao::DAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::share_dao::ShareDAO;
 use crate::database::daos::syncstate_dao::SyncStateDAO;
-use crate::database::entities::directory::{Directory, MinimalDirectoryObject};
+use crate::database::entities::directory::{Directory, DirectoryGetResponseObject};
 use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
 use crate::jwt_utils::extract_user_oid;
 use crate::storage::storage_provider::StorageProvider;
@@ -162,7 +162,7 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
 impl DirectoryDAO {
     pub async fn get_all_with_parent_id(
         parent_id: Option<ObjectId>,
-    ) -> actix_web::Result<Vec<MinimalDirectoryObject>> {
+    ) -> actix_web::Result<Vec<DirectoryGetResponseObject>> {
         let mut cursor = DirectoryDAO::get_collection()
             .await
             .find(
@@ -174,12 +174,14 @@ impl DirectoryDAO {
             .await
             .map_err(|_| actix_web::error::ErrorNotFound("Directories by parent_id not found"))?;
 
-        let mut dir_names: Vec<MinimalDirectoryObject> = vec![];
+        let mut dir_names: Vec<DirectoryGetResponseObject> = vec![];
         while let Some(dir) = cursor.next().await {
             if let Ok(dir) = dir {
-                dir_names.push(MinimalDirectoryObject {
+                dir_names.push(DirectoryGetResponseObject {
                     id: dir.id.unwrap(),
                     name: dir.name,
+                    child_dir_count: dir.child_ids.len() as u64,
+                    child_file_count: FileDAO::count_files_by_parent_id(dir.id.unwrap()).await?,
                 });
             }
         }

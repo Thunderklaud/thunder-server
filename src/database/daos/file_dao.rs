@@ -188,4 +188,16 @@ impl FileDAO {
 
         Ok(files)
     }
+    pub async fn count_files_by_parent_id(parent_id: ObjectId) -> actix_web::Result<u64> {
+        Ok(Self::get_collection()
+            .await
+            .count_documents(
+                doc! {
+                    "parent_id": parent_id
+                },
+                None,
+            )
+            .await
+            .map_err(|_| actix_web::error::ErrorNotFound("counting files by parent_id failed"))?)
+    }
 }
