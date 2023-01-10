@@ -51,14 +51,17 @@ pub struct DirectoryDelete {
 
 #[derive(Serialize)]
 pub struct DirectoryGetResponse {
-    pub dirs: Vec<MinimalDirectoryObject>,
+    pub dirs: Vec<DirectoryGetResponseObject>,
     pub files: Vec<File>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct MinimalDirectoryObject {
+pub struct DirectoryGetResponseObject {
     pub id: ObjectId,
     pub name: String,
+    pub child_dir_count: u64,
+    pub child_file_count: u64,
+    pub creation_date_ts: i64,
 }
 
 impl Directory {
