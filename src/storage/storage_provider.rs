@@ -1,6 +1,7 @@
 use crate::database::entities::file::File as DBFile;
 use crate::settings::Settings;
 use actix_files::NamedFile;
+use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
 use actix_web::web;
 use mime::Mime;
 use once_cell::sync::OnceCell;
@@ -39,6 +40,10 @@ impl StorageProvider {
     pub fn get_named_file(file: &DBFile) -> actix_web::Result<NamedFile> {
         let mut named_file = NamedFile::open(Self::get_direct_file_path(file.uuid.to_string()))?;
 
+        named_file = named_file.set_content_disposition(ContentDisposition {
+            disposition: DispositionType::Inline,
+            parameters: vec![DispositionParam::Filename(file.name.clone())],
+        });
         if let Ok(mime) = Mime::from_str(file.mime.as_str()) {
             named_file = named_file.set_content_type(mime);
         }
