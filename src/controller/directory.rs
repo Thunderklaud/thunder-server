@@ -154,7 +154,7 @@ pub async fn get_directory_archive_stream(
 
     let dir = DirectoryDAO::get_with_user(id, extract_user_oid(&_authenticated)).await?;
     match dir {
-        Some(dir) => {
+        Some(mut dir) => {
             let mut archive_method = ArchiveMethod::Tar;
             if let Some(archive) = &query_params.archive {
                 match archive.as_str() {
@@ -164,8 +164,18 @@ pub async fn get_directory_archive_stream(
                 }
             }
 
+            let file_name = format!(
+                "{}.{}",
+                match (&dir.name).as_str() {
+                    "/" => {
+                        dir.name = "root".to_string();
+                        "root"
+                    }
+                    _ => &dir.name,
+                },
+                archive_method.extension()
+            );
             let rx = StorageProvider::get_compressed_directory_stream(&dir, archive_method).await?;
-            let file_name = format!("{}.{}", &dir.name, archive_method.extension());
 
             return Ok(HttpResponse::Ok()
                 .content_type(archive_method.content_type())
