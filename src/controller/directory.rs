@@ -132,7 +132,7 @@ pub async fn get(
     let dir = DirectoryDAO::get_with_user(id, extract_user_oid(&_authenticated)).await?;
     match dir {
         Some(dir) => Ok(HttpResponse::Ok().json(DirectoryGetResponse {
-            dirs: DirectoryDAO::get_all_with_parent_id(dir.id).await?,
+            dirs: DirectoryDAO::get_all_with_parent_id_for_response(dir.id).await?,
             files: dir.get_files().await,
         })),
         _ => Err(actix_web::error::ErrorInternalServerError(

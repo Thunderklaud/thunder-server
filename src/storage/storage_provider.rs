@@ -9,6 +9,7 @@ use std::{fs, io};
 use actix_files::NamedFile;
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
 use actix_web::web;
+use async_recursion::async_recursion;
 use futures::channel::mpsc::Receiver;
 use futures::Stream;
 use futures_util::future::FlattenStream;
@@ -19,6 +20,7 @@ use tokio::io::BufWriter;
 use tracing::error;
 
 use crate::archive::{ArchiveMethod, FileWithPath};
+use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::Directory;
 use crate::database::entities::file::File as DBFile;
 use crate::settings::Settings;
@@ -99,15 +101,9 @@ impl StorageProvider {
         // Include 10 messages of buffer for erratic connection speeds.
         let (tx, rx) = futures::channel::mpsc::channel::<io::Result<actix_web::web::Bytes>>(10);
         let pipe = crate::pipe::Pipe::new(tx);
-        let mut files: Vec<FileWithPath> = Vec::new();
 
-        //add direct files in dir
-        for db_file in dir.get_files().await {
-            files.push(FileWithPath {
-                file: File::open(Self::get_direct_file_path(db_file.uuid.to_string()))?,
-                path: format!("{}/{}", dir.name, &db_file.name),
-            });
-        }
+        let mut files: Vec<FileWithPath> = Vec::new();
+        Self::rec_add_dir_files_to_vec(&mut files, dir, "".to_string()).await;
 
         // Start the actual archive creation in a separate thread.
         std::thread::spawn(move || {
@@ -117,5 +113,33 @@ impl StorageProvider {
         });
 
         Ok(rx)
+    }
+
+    #[async_recursion(?Send)]
+    async fn rec_add_dir_files_to_vec(
+        files: &mut Vec<FileWithPath>,
+        dir: &Directory,
+        path_prefix: String,
+    ) {
+        //add direct files in dir
+        for db_file in dir.get_files().await {
+            if let Ok(file) = File::open(Self::get_direct_file_path(db_file.uuid.to_string())) {
+                files.push(FileWithPath {
+                    file,
+                    path: format!("{}{}/{}", path_prefix, dir.name, &db_file.name),
+                });
+            }
+        }
+
+        if let Ok(dirs) = DirectoryDAO::get_all_with_parent_id(dir.id).await {
+            for child_dir in dirs {
+                Self::rec_add_dir_files_to_vec(
+                    files,
+                    &child_dir,
+                    format!("{}{}/", path_prefix, dir.name),
+                )
+                .await;
+            }
+        }
     }
 }
