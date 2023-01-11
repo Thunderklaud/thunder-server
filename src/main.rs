@@ -13,10 +13,12 @@ use tracing::{event, Level};
 
 extern crate strum_macros;
 
+mod archive;
 mod cmd;
 mod controller;
 mod database;
 mod jwt_utils;
+mod pipe;
 mod settings;
 mod storage;
 
@@ -109,7 +111,17 @@ async fn main() -> Result<()> {
                             .route("/file", web::delete().to(controller::file::delete))
                             .service(
                                 web::scope("/download")
-                                    .route("/file", web::get().to(controller::file::get_single)),
+                                    .route("/file", web::get().to(controller::file::get_single))
+                                    .route(
+                                        "/file/archive",
+                                        web::get().to(controller::file::get_single_archive_stream),
+                                    )
+                                    .route(
+                                        "/directory",
+                                        web::get().to(
+                                            controller::directory::get_directory_archive_stream,
+                                        ),
+                                    ),
                             ),
                     )
                     .service(

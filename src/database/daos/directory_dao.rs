@@ -162,7 +162,7 @@ impl DAO<Directory, ObjectId> for DirectoryDAO {
 impl DirectoryDAO {
     pub async fn get_all_with_parent_id(
         parent_id: Option<ObjectId>,
-    ) -> actix_web::Result<Vec<DirectoryGetResponseObject>> {
+    ) -> actix_web::Result<Vec<Directory>> {
         let mut cursor = DirectoryDAO::get_collection()
             .await
             .find(
@@ -174,17 +174,27 @@ impl DirectoryDAO {
             .await
             .map_err(|_| actix_web::error::ErrorNotFound("Directories by parent_id not found"))?;
 
-        let mut dir_names: Vec<DirectoryGetResponseObject> = vec![];
+        let mut dirs: Vec<Directory> = vec![];
         while let Some(dir) = cursor.next().await {
             if let Ok(dir) = dir {
-                dir_names.push(DirectoryGetResponseObject {
-                    id: dir.id.unwrap(),
-                    name: dir.name,
-                    child_dir_count: dir.child_ids.len() as u64,
-                    child_file_count: FileDAO::count_files_by_parent_id(dir.id.unwrap()).await?,
-                    creation_date_ts: dir.creation_date.timestamp_millis(),
-                });
+                dirs.push(dir);
             }
+        }
+        Ok(dirs)
+    }
+
+    pub async fn get_all_with_parent_id_for_response(
+        parent_id: Option<ObjectId>,
+    ) -> actix_web::Result<Vec<DirectoryGetResponseObject>> {
+        let mut dir_names: Vec<DirectoryGetResponseObject> = vec![];
+        for dir in Self::get_all_with_parent_id(parent_id).await? {
+            dir_names.push(DirectoryGetResponseObject {
+                id: dir.id.unwrap(),
+                name: dir.name,
+                child_dir_count: dir.child_ids.len() as u64,
+                child_file_count: FileDAO::count_files_by_parent_id(dir.id.unwrap()).await?,
+                creation_date_ts: dir.creation_date.timestamp_millis(),
+            });
         }
         Ok(dir_names)
     }

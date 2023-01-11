@@ -29,6 +29,12 @@ pub struct GetSingleQueryParams {
 }
 
 #[derive(Deserialize)]
+pub struct GetSingleArchiveQueryParams {
+    pub uuid: String,
+    pub archive: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct MultiUploadQueryParams {
     pub directory: String,
 }

@@ -44,6 +44,12 @@ pub struct DirectoryGet {
     pub id: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct GetDirectoryArchiveQueryParams {
+    pub id: Option<String>,
+    pub archive: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DirectoryDelete {
     pub id: String,

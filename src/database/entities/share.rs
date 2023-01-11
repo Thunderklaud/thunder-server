@@ -26,6 +26,7 @@ impl MyDBModel for Share {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShareGet {
     pub id: ObjectId,
+    pub archive: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

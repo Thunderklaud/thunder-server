@@ -10,12 +10,13 @@ use futures_util::TryStreamExt;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
 
+use crate::archive::ArchiveMethod;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::file::{
-    File, FilePatch, GetSingleQueryParams, MultiUploadQueryParams,
+    File, FilePatch, GetSingleArchiveQueryParams, GetSingleQueryParams, MultiUploadQueryParams,
 };
 use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
 use crate::jwt_utils::extract_user_oid;
@@ -31,6 +32,40 @@ pub async fn get_single(
             .await?
     {
         return Ok(StorageProvider::get_named_file(&file)?);
+    }
+
+    return Err(actix_web::error::ErrorBadRequest("File not found"));
+}
+
+pub async fn get_single_archive_stream(
+    _authenticated: Authenticated<Claims>,
+    query_params: web::Query<GetSingleArchiveQueryParams>,
+) -> actix_web::Result<HttpResponse> {
+    if let Some(file) =
+        FileDAO::get_file_by_uuid_for_user(&query_params.uuid, extract_user_oid(&_authenticated))
+            .await?
+    {
+        let mut archive_method = ArchiveMethod::Tar;
+        if let Some(archive) = &query_params.archive {
+            match archive.as_str() {
+                "zip" => archive_method = ArchiveMethod::Zip,
+                "tar.gz" => archive_method = ArchiveMethod::TarGz,
+                _ => archive_method = ArchiveMethod::Tar,
+            }
+        }
+
+        let rx = StorageProvider::get_compressed_file_stream(&file, archive_method)?;
+        let file_name = format!("{}.{}", &file.name, archive_method.extension());
+
+        return Ok(HttpResponse::Ok()
+            .content_type(archive_method.content_type())
+            .append_header(archive_method.content_encoding())
+            .append_header(("Content-Transfer-Encoding", "binary"))
+            .append_header((
+                "Content-Disposition",
+                format!("attachment; filename={:?}", file_name),
+            ))
+            .body(actix_web::body::BodyStream::new(rx)));
     }
 
     return Err(actix_web::error::ErrorBadRequest("File not found"));

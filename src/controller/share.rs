@@ -1,7 +1,7 @@
-use actix_files::NamedFile;
+use crate::archive::ArchiveMethod;
 use actix_jwt_authc::Authenticated;
 use actix_web::web::Json;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use mongodb::bson::DateTime;
 
 use crate::database::daos::dao::DAO;
@@ -25,7 +25,10 @@ pub async fn get_share_info(
     ))
 }
 
-pub async fn download(share_get_data: web::Query<ShareGet>) -> actix_web::Result<NamedFile> {
+pub async fn download(
+    share_get_data: web::Query<ShareGet>,
+    req: HttpRequest,
+) -> actix_web::Result<HttpResponse> {
     if let Some(mut share) = ShareDAO::get(share_get_data.id).await? {
         if let Some(valid_until) = share.valid_until {
             if valid_until < DateTime::now() {
@@ -42,8 +45,34 @@ pub async fn download(share_get_data: web::Query<ShareGet>) -> actix_web::Result
         return match share.get_type() {
             ShareType::File => {
                 if let Some(file) = FileDAO::get(share.corresponding_id).await? {
+                    let mut archive_method: Option<ArchiveMethod> = None;
+                    if let Some(archive) = &share_get_data.archive {
+                        archive_method = Some(match archive.as_str() {
+                            "zip" => ArchiveMethod::Zip,
+                            "tar.gz" => ArchiveMethod::TarGz,
+                            _ => ArchiveMethod::Tar,
+                        })
+                    }
+
                     ShareDAO::register_share_download(&mut share).await?;
-                    return Ok(StorageProvider::get_named_file(&file)?);
+
+                    if let Some(archive_method) = archive_method {
+                        let rx =
+                            StorageProvider::get_compressed_file_stream(&file, archive_method)?;
+                        let file_name = format!("{}.{}", &file.name, archive_method.extension());
+
+                        return Ok(HttpResponse::Ok()
+                            .content_type(archive_method.content_type())
+                            .append_header(archive_method.content_encoding())
+                            .append_header(("Content-Transfer-Encoding", "binary"))
+                            .append_header((
+                                "Content-Disposition",
+                                format!("attachment; filename={:?}", file_name),
+                            ))
+                            .body(actix_web::body::BodyStream::new(rx)));
+                    }
+
+                    return Ok(StorageProvider::get_named_file(&file)?.into_response(&req));
                 }
                 Err(actix_web::error::ErrorInternalServerError(
                     "Requested file could not be found",
