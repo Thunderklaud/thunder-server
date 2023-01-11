@@ -1,9 +1,6 @@
 use std::fs::File;
-use std::io::{Read, Result as IoResult, Write};
-use std::path::Path;
-use std::pin::Pin;
+use std::io::Result as IoResult;
 use std::str::FromStr;
-use std::task::{Context, Poll};
 use std::{fs, io};
 
 use actix_files::NamedFile;
@@ -11,12 +8,8 @@ use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionT
 use actix_web::web;
 use async_recursion::async_recursion;
 use futures::channel::mpsc::Receiver;
-use futures::Stream;
-use futures_util::future::FlattenStream;
-use futures_util::FutureExt;
 use mime::Mime;
 use once_cell::sync::OnceCell;
-use tokio::io::BufWriter;
 use tracing::error;
 
 use crate::archive::{ArchiveMethod, FileWithPath};

@@ -6,10 +6,9 @@ use actix_jwt_authc::Authenticated;
 use actix_multipart::Multipart;
 use actix_web::web::Json;
 use actix_web::{web, HttpRequest, HttpResponse};
-use futures_util::{FutureExt, TryStreamExt};
+use futures_util::TryStreamExt;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
-use tokio::io::BufWriter;
 
 use crate::archive::ArchiveMethod;
 use crate::database::daos::dao::DAO;

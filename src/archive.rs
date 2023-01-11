@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use actix_web::http::header::ContentEncoding;
 use libflate::gzip::Encoder;
@@ -43,14 +43,6 @@ impl ArchiveMethod {
             ArchiveMethod::TarGz => ContentEncoding::Gzip,
             ArchiveMethod::Tar => ContentEncoding::Identity,
             ArchiveMethod::Zip => ContentEncoding::Identity,
-        }
-    }
-
-    pub fn is_enabled(self, tar_enabled: bool, tar_gz_enabled: bool, zip_enabled: bool) -> bool {
-        match self {
-            ArchiveMethod::TarGz => tar_gz_enabled,
-            ArchiveMethod::Tar => tar_enabled,
-            ArchiveMethod::Zip => zip_enabled,
         }
     }
 
@@ -144,39 +136,11 @@ where
     Ok(())
 }
 
-/// Write a zip of `dir` in `out`.
-///
-/// The target directory will be saved as a top-level directory in the archive.
-///
-/// For example, consider this directory structure:
-///
-/// ```ignore
-/// a
-/// └── b
-///     └── c
-///         ├── e
-///         ├── f
-///         └── g
-/// ```
-///
-/// Making a zip out of `"a/b/c"` will result in this archive content:
-///
-/// ```ignore
-/// c
-/// ├── e
-/// ├── f
-/// └── g
-/// ```
 fn create_zip_from_file_with_path_vec<W>(out: W, files: Vec<FileWithPath>) -> actix_web::Result<()>
 where
     W: std::io::Write + std::io::Seek,
 {
     let options = write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    /*let mut paths_queue: Vec<PathBuf> = vec![directory.to_path_buf()];
-    let zip_root_folder_name = directory.file_name().ok_or_else(|| {
-        ContextualError::InvalidPathError("Directory name terminates in \"..\"".to_string())
-    })?;*/
-
     let mut zip_writer = ZipWriter::new(out);
     let mut buffer = Vec::new();
 
@@ -200,18 +164,6 @@ where
             ))
         })?;
         buffer.clear();
-
-        /*} else if entry_metadata.is_dir() {
-            let relative_path = zip_directory.join(current_entry_name).into_os_string();
-            zip_writer
-                .add_directory(relative_path.to_string_lossy(), options)
-                .map_err(|_| {
-                    ContextualError::ArchiveCreationDetailError(
-                        "Could not add directory path to ZIP".to_string(),
-                    )
-                })?;
-            paths_queue.push(entry_path.clone());
-        }*/
     }
 
     zip_writer.finish().map_err(|e| {
