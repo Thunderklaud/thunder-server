@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::str::FromStr;
 
+use crate::archive::ArchiveMethod;
 use actix_jwt_authc::Authenticated;
 use actix_web::{web, web::Json, HttpResponse};
 use mongodb::bson::oid::ObjectId;
@@ -12,8 +13,10 @@ use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::{
     Directory, DirectoryDelete, DirectoryGet, DirectoryGetResponse, DirectoryPatch, DirectoryPost,
+    GetDirectoryArchiveQueryParams,
 };
 use crate::jwt_utils::extract_user_oid;
+use crate::storage::storage_provider::StorageProvider;
 use crate::Claims;
 
 pub async fn create(
@@ -132,6 +135,48 @@ pub async fn get(
             dirs: DirectoryDAO::get_all_with_parent_id(dir.id).await?,
             files: dir.get_files().await,
         })),
+        _ => Err(actix_web::error::ErrorInternalServerError(
+            "Could not get requested directory",
+        )),
+    }
+}
+
+pub async fn get_directory_archive_stream(
+    _authenticated: Authenticated<Claims>,
+    query_params: web::Query<GetDirectoryArchiveQueryParams>,
+) -> actix_web::Result<HttpResponse> {
+    let id = match &query_params.id {
+        Some(id) if !id.is_empty() => {
+            ObjectId::from_str(id).map_err(|e| actix_web::error::ErrorBadRequest(e))?
+        }
+        _ => _authenticated.claims.thunder_root_dir_id,
+    };
+
+    let dir = DirectoryDAO::get_with_user(id, extract_user_oid(&_authenticated)).await?;
+    match dir {
+        Some(dir) => {
+            let mut archive_method = ArchiveMethod::Tar;
+            if let Some(archive) = &query_params.archive {
+                match archive.as_str() {
+                    "zip" => archive_method = ArchiveMethod::Zip,
+                    "tar.gz" => archive_method = ArchiveMethod::TarGz,
+                    _ => archive_method = ArchiveMethod::Tar,
+                }
+            }
+
+            let rx = StorageProvider::get_compressed_directory_stream(&dir, archive_method).await?;
+            let file_name = format!("{}.{}", &dir.name, archive_method.extension());
+
+            return Ok(HttpResponse::Ok()
+                .content_type(archive_method.content_type())
+                .append_header(archive_method.content_encoding())
+                .append_header(("Content-Transfer-Encoding", "binary"))
+                .append_header((
+                    "Content-Disposition",
+                    format!("attachment; filename={:?}", file_name),
+                ))
+                .body(actix_web::body::BodyStream::new(rx)));
+        }
         _ => Err(actix_web::error::ErrorInternalServerError(
             "Could not get requested directory",
         )),

@@ -1,6 +1,11 @@
-use crate::archive::{ArchiveMethod, FileWithPath};
-use crate::database::entities::file::File as DBFile;
-use crate::settings::Settings;
+use std::fs::File;
+use std::io::{Read, Result as IoResult, Write};
+use std::path::Path;
+use std::pin::Pin;
+use std::str::FromStr;
+use std::task::{Context, Poll};
+use std::{fs, io};
+
 use actix_files::NamedFile;
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
 use actix_web::web;
@@ -10,15 +15,13 @@ use futures_util::future::FlattenStream;
 use futures_util::FutureExt;
 use mime::Mime;
 use once_cell::sync::OnceCell;
-use std::fs::File;
-use std::io::{Read, Result as IoResult, Write};
-use std::path::Path;
-use std::pin::Pin;
-use std::str::FromStr;
-use std::task::{Context, Poll};
-use std::{fs, io};
 use tokio::io::BufWriter;
 use tracing::error;
+
+use crate::archive::{ArchiveMethod, FileWithPath};
+use crate::database::entities::directory::Directory;
+use crate::database::entities::file::File as DBFile;
+use crate::settings::Settings;
 
 static UPLOAD_PATH: OnceCell<String> = OnceCell::new();
 
@@ -77,6 +80,34 @@ impl StorageProvider {
             file: real_file,
             path: (&file.name).clone(),
         });
+
+        // Start the actual archive creation in a separate thread.
+        std::thread::spawn(move || {
+            if let Err(err) = archive_method.create_archive(files, pipe) {
+                error!("Error during archive creation: {:?}", err);
+            }
+        });
+
+        Ok(rx)
+    }
+    pub async fn get_compressed_directory_stream(
+        dir: &Directory,
+        archive_method: ArchiveMethod,
+    ) -> actix_web::Result<Receiver<io::Result<actix_web::web::Bytes>>> {
+        // We will create the archive in a separate thread, and stream the content using a pipe.
+        // The pipe is made of a futures channel, and an adapter to implement the `Write` trait.
+        // Include 10 messages of buffer for erratic connection speeds.
+        let (tx, rx) = futures::channel::mpsc::channel::<io::Result<actix_web::web::Bytes>>(10);
+        let pipe = crate::pipe::Pipe::new(tx);
+        let mut files: Vec<FileWithPath> = Vec::new();
+
+        //add direct files in dir
+        for db_file in dir.get_files().await {
+            files.push(FileWithPath {
+                file: File::open(Self::get_direct_file_path(db_file.uuid.to_string()))?,
+                path: format!("{}/{}", dir.name, &db_file.name),
+            });
+        }
 
         // Start the actual archive creation in a separate thread.
         std::thread::spawn(move || {
