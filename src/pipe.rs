@@ -1,0 +1,73 @@
+/*
+MIT License
+
+Copyright (c) 2018 Sven-Hendrik Haase
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+//! Define an adapter to implement `std::io::Write` on `Sender<Bytes>`.
+use std::io::{self, Error, ErrorKind, Write};
+
+use actix_web::web::{Bytes, BytesMut};
+use futures::channel::mpsc::Sender;
+use futures::executor::block_on;
+use futures::sink::SinkExt;
+
+/// Adapter to implement the `std::io::Write` trait on a `Sender<Bytes>` from a futures channel.
+///
+/// It uses an intermediate buffer to transfer packets.
+pub struct Pipe {
+    dest: Sender<io::Result<Bytes>>,
+    bytes: BytesMut,
+}
+
+impl Pipe {
+    /// Wrap the given sender in a `Pipe`.
+    pub fn new(destination: Sender<io::Result<Bytes>>) -> Self {
+        Pipe {
+            dest: destination,
+            bytes: BytesMut::new(),
+        }
+    }
+}
+
+impl Drop for Pipe {
+    fn drop(&mut self) {
+        let _ = block_on(self.dest.close());
+    }
+}
+
+impl Write for Pipe {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        // We are given a slice of bytes we do not own, so we must start by copying it.
+        self.bytes.extend_from_slice(buf);
+
+        // Then, take the buffer and send it in the channel.
+        block_on(self.dest.send(Ok(self.bytes.split().into())))
+            .map_err(|e| Error::new(ErrorKind::UnexpectedEof, e))?;
+
+        // Return how much we sent - all of it.
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        block_on(self.dest.flush()).map_err(|e| Error::new(ErrorKind::UnexpectedEof, e))
+    }
+}
