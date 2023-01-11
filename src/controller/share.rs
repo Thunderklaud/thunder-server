@@ -5,6 +5,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use mongodb::bson::DateTime;
 
 use crate::database::daos::dao::DAO;
+use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::share_dao::ShareDAO;
 use crate::database::entities::file::GetSingleQueryParams;
@@ -76,6 +77,47 @@ pub async fn download(
                 }
                 Err(actix_web::error::ErrorInternalServerError(
                     "Requested file could not be found",
+                ))
+            }
+            ShareType::Directory => {
+                if let Some(mut dir) = DirectoryDAO::get(share.corresponding_id).await? {
+                    ShareDAO::register_share_download(&mut share).await?;
+
+                    let mut archive_method = ArchiveMethod::Tar;
+                    if let Some(archive) = &share_get_data.archive {
+                        archive_method = match archive.as_str() {
+                            "zip" => ArchiveMethod::Zip,
+                            "tar.gz" => ArchiveMethod::TarGz,
+                            _ => ArchiveMethod::Tar,
+                        }
+                    }
+
+                    let file_name = format!(
+                        "{}.{}",
+                        match (&dir.name).as_str() {
+                            "/" => {
+                                dir.name = "root".to_string();
+                                "root"
+                            }
+                            _ => &dir.name,
+                        },
+                        archive_method.extension()
+                    );
+                    let rx = StorageProvider::get_compressed_directory_stream(&dir, archive_method)
+                        .await?;
+
+                    return Ok(HttpResponse::Ok()
+                        .content_type(archive_method.content_type())
+                        .append_header(archive_method.content_encoding())
+                        .append_header(("Content-Transfer-Encoding", "binary"))
+                        .append_header((
+                            "Content-Disposition",
+                            format!("attachment; filename={:?}", file_name),
+                        ))
+                        .body(actix_web::body::BodyStream::new(rx)));
+                }
+                Err(actix_web::error::ErrorInternalServerError(
+                    "Requested directory could not be found",
                 ))
             }
             _ => Err(actix_web::error::ErrorInternalServerError(

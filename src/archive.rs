@@ -46,7 +46,7 @@ impl ArchiveMethod {
         }
     }
 
-    /// Make an archive out of the given Vec<FileWithPath>, and write the output to the given writer.
+    /// Make an archive out of the given FileWithPath vec, and write the output to the given writer.
     pub fn create_archive<W>(self, files: Vec<FileWithPath>, out: W) -> actix_web::Result<()>
     where
         W: std::io::Write,
