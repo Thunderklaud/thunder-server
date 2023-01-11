@@ -7,6 +7,7 @@ use libflate::gzip::Encoder;
 use serde::Deserialize;
 use strum::{Display, EnumIter, EnumString};
 use tar::Builder;
+use zip::{write, ZipWriter};
 
 /// Available archive methods
 #[derive(Deserialize, Clone, Copy, EnumIter, EnumString, Display)]
@@ -61,8 +62,7 @@ impl ArchiveMethod {
         match self {
             ArchiveMethod::TarGz => tar_gz(files, out),
             ArchiveMethod::Tar => tar(files, out),
-            //ArchiveMethod::Zip => zip_dir(files, out),
-            ArchiveMethod::Zip => unimplemented!(),
+            ArchiveMethod::Zip => zip_data(files, out),
         }
     }
 }
@@ -116,5 +116,109 @@ where
         ))
     })?;
 
+    Ok(())
+}
+
+/// Writes a zip of `files` in `out`.
+fn zip_data<W>(files: Vec<FileWithPath>, mut out: W) -> actix_web::Result<()>
+where
+    W: std::io::Write,
+{
+    let mut data = Vec::new();
+    let memory_file = Cursor::new(&mut data);
+
+    create_zip_from_file_with_path_vec(memory_file, files).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!(
+            "Failed to create the ZIP archive, {:?}",
+            e
+        ))
+    })?;
+
+    out.write_all(data.as_mut_slice()).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!(
+            "Failed to write the ZIP archive, {:?}",
+            e
+        ))
+    })?;
+
+    Ok(())
+}
+
+/// Write a zip of `dir` in `out`.
+///
+/// The target directory will be saved as a top-level directory in the archive.
+///
+/// For example, consider this directory structure:
+///
+/// ```ignore
+/// a
+/// └── b
+///     └── c
+///         ├── e
+///         ├── f
+///         └── g
+/// ```
+///
+/// Making a zip out of `"a/b/c"` will result in this archive content:
+///
+/// ```ignore
+/// c
+/// ├── e
+/// ├── f
+/// └── g
+/// ```
+fn create_zip_from_file_with_path_vec<W>(out: W, files: Vec<FileWithPath>) -> actix_web::Result<()>
+where
+    W: std::io::Write + std::io::Seek,
+{
+    let options = write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    /*let mut paths_queue: Vec<PathBuf> = vec![directory.to_path_buf()];
+    let zip_root_folder_name = directory.file_name().ok_or_else(|| {
+        ContextualError::InvalidPathError("Directory name terminates in \"..\"".to_string())
+    })?;*/
+
+    let mut zip_writer = ZipWriter::new(out);
+    let mut buffer = Vec::new();
+
+    for mut fp in files {
+        fp.file.read_to_end(&mut buffer).map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Could not read from file, {:?}", e))
+        })?;
+
+        zip_writer
+            .start_file(Path::new(&fp.path).to_string_lossy(), options)
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Could not add file path to ZIP, {:?}",
+                    e
+                ))
+            })?;
+        zip_writer.write(buffer.as_ref()).map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!(
+                "Could not write file to ZIP, {:?}",
+                e
+            ))
+        })?;
+        buffer.clear();
+
+        /*} else if entry_metadata.is_dir() {
+            let relative_path = zip_directory.join(current_entry_name).into_os_string();
+            zip_writer
+                .add_directory(relative_path.to_string_lossy(), options)
+                .map_err(|_| {
+                    ContextualError::ArchiveCreationDetailError(
+                        "Could not add directory path to ZIP".to_string(),
+                    )
+                })?;
+            paths_queue.push(entry_path.clone());
+        }*/
+    }
+
+    zip_writer.finish().map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!(
+            "Could not finish writing ZIP archive, {:?}",
+            e
+        ))
+    })?;
     Ok(())
 }
