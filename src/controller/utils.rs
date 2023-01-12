@@ -1,5 +1,9 @@
+use actix_web::HttpResponse;
+use futures::channel::mpsc::Receiver;
+use std::io;
 use std::str::FromStr;
 
+use crate::archive::ArchiveMethod;
 use mongodb::bson::oid::ObjectId;
 
 pub fn extract_object_id(
@@ -20,4 +24,20 @@ pub fn extract_object_id_or_die(id: Option<&String>) -> actix_web::Result<Object
     }
 
     Err(actix_web::error::ErrorBadRequest("no ObjectId to extract"))
+}
+
+pub fn get_archive_file_stream_http_response(
+    archive_method: ArchiveMethod,
+    file_name: String,
+    rx: Receiver<io::Result<actix_web::web::Bytes>>,
+) -> actix_web::Result<HttpResponse> {
+    Ok(HttpResponse::Ok()
+        .content_type(archive_method.content_type())
+        .append_header(archive_method.content_encoding())
+        .append_header(("Content-Transfer-Encoding", "binary"))
+        .append_header((
+            "Content-Disposition",
+            format!("attachment; filename={:?}", file_name),
+        ))
+        .body(actix_web::body::BodyStream::new(rx)))
 }

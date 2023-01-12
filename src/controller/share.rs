@@ -4,6 +4,7 @@ use actix_web::web::Json;
 use actix_web::{web, HttpRequest, HttpResponse};
 use mongodb::bson::DateTime;
 
+use crate::controller::utils::get_archive_file_stream_http_response;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
@@ -47,30 +48,21 @@ pub async fn download(
             ShareType::File => {
                 if let Some(file) = FileDAO::get(share.corresponding_id).await? {
                     let mut archive_method: Option<ArchiveMethod> = None;
-                    if let Some(archive) = &share_get_data.archive {
-                        archive_method = Some(match archive.as_str() {
-                            "zip" => ArchiveMethod::Zip,
-                            "tar.gz" => ArchiveMethod::TarGz,
-                            _ => ArchiveMethod::Tar,
-                        })
+                    if (&share_get_data.archive).is_some() {
+                        archive_method = Some(ArchiveMethod::extract_from_str_option(
+                            &share_get_data.archive,
+                            ArchiveMethod::Tar,
+                        ));
                     }
 
                     ShareDAO::register_share_download(&mut share).await?;
 
                     if let Some(archive_method) = archive_method {
-                        let rx =
-                            StorageProvider::get_compressed_file_stream(&file, archive_method)?;
-                        let file_name = format!("{}.{}", &file.name, archive_method.extension());
-
-                        return Ok(HttpResponse::Ok()
-                            .content_type(archive_method.content_type())
-                            .append_header(archive_method.content_encoding())
-                            .append_header(("Content-Transfer-Encoding", "binary"))
-                            .append_header((
-                                "Content-Disposition",
-                                format!("attachment; filename={:?}", file_name),
-                            ))
-                            .body(actix_web::body::BodyStream::new(rx)));
+                        return get_archive_file_stream_http_response(
+                            archive_method,
+                            format!("{}.{}", &file.name, archive_method.extension()),
+                            StorageProvider::get_compressed_file_stream(&file, archive_method)?,
+                        );
                     }
 
                     return Ok(StorageProvider::get_named_file(&file)?.into_response(&req));
@@ -83,38 +75,27 @@ pub async fn download(
                 if let Some(mut dir) = DirectoryDAO::get(share.corresponding_id).await? {
                     ShareDAO::register_share_download(&mut share).await?;
 
-                    let mut archive_method = ArchiveMethod::Tar;
-                    if let Some(archive) = &share_get_data.archive {
-                        archive_method = match archive.as_str() {
-                            "zip" => ArchiveMethod::Zip,
-                            "tar.gz" => ArchiveMethod::TarGz,
-                            _ => ArchiveMethod::Tar,
-                        }
-                    }
-
-                    let file_name = format!(
-                        "{}.{}",
-                        match (&dir.name).as_str() {
-                            "/" => {
-                                dir.name = "root".to_string();
-                                "root"
-                            }
-                            _ => &dir.name,
-                        },
-                        archive_method.extension()
+                    let archive_method = ArchiveMethod::extract_from_str_option(
+                        &share_get_data.archive,
+                        ArchiveMethod::Tar,
                     );
-                    let rx = StorageProvider::get_compressed_directory_stream(&dir, archive_method)
-                        .await?;
 
-                    return Ok(HttpResponse::Ok()
-                        .content_type(archive_method.content_type())
-                        .append_header(archive_method.content_encoding())
-                        .append_header(("Content-Transfer-Encoding", "binary"))
-                        .append_header((
-                            "Content-Disposition",
-                            format!("attachment; filename={:?}", file_name),
-                        ))
-                        .body(actix_web::body::BodyStream::new(rx)));
+                    return get_archive_file_stream_http_response(
+                        archive_method,
+                        format!(
+                            "{}.{}",
+                            match (&dir.name).as_str() {
+                                "/" => {
+                                    dir.name = "root".to_string();
+                                    "root"
+                                }
+                                _ => &dir.name,
+                            },
+                            archive_method.extension()
+                        ),
+                        StorageProvider::get_compressed_directory_stream(&dir, archive_method)
+                            .await?,
+                    );
                 }
                 Err(actix_web::error::ErrorInternalServerError(
                     "Requested directory could not be found",
