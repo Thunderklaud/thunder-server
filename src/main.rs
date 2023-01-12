@@ -113,10 +113,6 @@ async fn main() -> Result<()> {
                                 web::scope("/download")
                                     .route("/file", web::get().to(controller::file::get_single))
                                     .route(
-                                        "/file/archive",
-                                        web::get().to(controller::file::get_single_archive_stream),
-                                    )
-                                    .route(
                                         "/directory",
                                         web::get().to(
                                             controller::directory::get_directory_archive_stream,

@@ -26,11 +26,6 @@ impl MyDBModel for File {
 #[derive(Deserialize)]
 pub struct GetSingleQueryParams {
     pub uuid: String,
-}
-
-#[derive(Deserialize)]
-pub struct GetSingleArchiveQueryParams {
-    pub uuid: String,
     pub archive: Option<String>,
 }
 
