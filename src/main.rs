@@ -113,10 +113,6 @@ async fn main() -> Result<()> {
                                 web::scope("/download")
                                     .route("/file", web::get().to(controller::file::get_single))
                                     .route(
-                                        "/file/archive",
-                                        web::get().to(controller::file::get_single_archive_stream),
-                                    )
-                                    .route(
                                         "/directory",
                                         web::get().to(
                                             controller::directory::get_directory_archive_stream,
@@ -129,6 +125,14 @@ async fn main() -> Result<()> {
                             .route("/", web::get().to(controller::share::get_share_info))
                             .route("/", web::delete().to(controller::share::delete_share))
                             .route("/download", web::get().to(controller::share::download))
+                            .route(
+                                "/directory",
+                                web::post().to(controller::share::create_directory_share),
+                            )
+                            .route(
+                                "/directory",
+                                web::get().to(controller::share::get_share_infos_for_directory),
+                            )
                             .route(
                                 "/file",
                                 web::post().to(controller::share::create_file_share),

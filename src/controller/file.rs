@@ -1,7 +1,6 @@
 use std::io::Write;
 use std::str::FromStr;
 
-use actix_files::NamedFile;
 use actix_jwt_authc::Authenticated;
 use actix_multipart::Multipart;
 use actix_web::web::Json;
@@ -11,12 +10,13 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{DateTime, Uuid};
 
 use crate::archive::ArchiveMethod;
+use crate::controller::utils::get_archive_file_stream_http_response;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::syncstate_dao::SyncStateDAO;
 use crate::database::entities::file::{
-    File, FilePatch, GetSingleArchiveQueryParams, GetSingleQueryParams, MultiUploadQueryParams,
+    File, FilePatch, GetSingleQueryParams, MultiUploadQueryParams,
 };
 use crate::database::entities::syncstate::{SyncState, SyncStateAction, SyncStateType};
 use crate::jwt_utils::extract_user_oid;
@@ -26,46 +26,29 @@ use crate::Claims;
 pub async fn get_single(
     _authenticated: Authenticated<Claims>,
     query_params: web::Query<GetSingleQueryParams>,
-) -> actix_web::Result<NamedFile> {
-    if let Some(file) =
-        FileDAO::get_file_by_uuid_for_user(&query_params.uuid, extract_user_oid(&_authenticated))
-            .await?
-    {
-        return Ok(StorageProvider::get_named_file(&file)?);
-    }
-
-    return Err(actix_web::error::ErrorBadRequest("File not found"));
-}
-
-pub async fn get_single_archive_stream(
-    _authenticated: Authenticated<Claims>,
-    query_params: web::Query<GetSingleArchiveQueryParams>,
+    req: HttpRequest,
 ) -> actix_web::Result<HttpResponse> {
     if let Some(file) =
         FileDAO::get_file_by_uuid_for_user(&query_params.uuid, extract_user_oid(&_authenticated))
             .await?
     {
-        let mut archive_method = ArchiveMethod::Tar;
-        if let Some(archive) = &query_params.archive {
-            match archive.as_str() {
-                "zip" => archive_method = ArchiveMethod::Zip,
-                "tar.gz" => archive_method = ArchiveMethod::TarGz,
-                _ => archive_method = ArchiveMethod::Tar,
-            }
+        let mut archive_method: Option<ArchiveMethod> = None;
+        if (&query_params.archive).is_some() {
+            archive_method = Some(ArchiveMethod::extract_from_str_option(
+                &query_params.archive,
+                ArchiveMethod::Tar,
+            ));
         }
 
-        let rx = StorageProvider::get_compressed_file_stream(&file, archive_method)?;
-        let file_name = format!("{}.{}", &file.name, archive_method.extension());
+        if let Some(archive_method) = archive_method {
+            return get_archive_file_stream_http_response(
+                archive_method,
+                format!("{}.{}", &file.name, archive_method.extension()),
+                StorageProvider::get_compressed_file_stream(&file, archive_method)?,
+            );
+        }
 
-        return Ok(HttpResponse::Ok()
-            .content_type(archive_method.content_type())
-            .append_header(archive_method.content_encoding())
-            .append_header(("Content-Transfer-Encoding", "binary"))
-            .append_header((
-                "Content-Disposition",
-                format!("attachment; filename={:?}", file_name),
-            ))
-            .body(actix_web::body::BodyStream::new(rx)));
+        return Ok(StorageProvider::get_named_file(&file)?.into_response(&req));
     }
 
     return Err(actix_web::error::ErrorBadRequest("File not found"));

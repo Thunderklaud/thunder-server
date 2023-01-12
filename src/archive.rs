@@ -20,6 +20,20 @@ pub enum ArchiveMethod {
 }
 
 impl ArchiveMethod {
+    pub fn extract_from_str_option(
+        archive: &Option<String>,
+        use_method_if_none: ArchiveMethod,
+    ) -> ArchiveMethod {
+        let mut archive_method = use_method_if_none;
+        if let Some(archive) = archive {
+            archive_method = match archive.as_str() {
+                "zip" => ArchiveMethod::Zip,
+                "tar.gz" => ArchiveMethod::TarGz,
+                _ => ArchiveMethod::Tar,
+            }
+        }
+        archive_method
+    }
     pub fn extension(self) -> String {
         match self {
             ArchiveMethod::TarGz => "tar.gz",

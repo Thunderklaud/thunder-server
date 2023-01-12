@@ -42,6 +42,14 @@ pub struct FileShareCreate {
     pub valid_until: Option<i64>,  // timestamp with milliseconds
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DirectoryShareCreate {
+    pub id: ObjectId,
+    pub label: String,
+    pub max_dl_count: Option<u32>, // max. 4294967295 with u32
+    pub valid_until: Option<i64>,  // timestamp with milliseconds
+}
+
 pub enum ShareType {
     Directory,
     File,

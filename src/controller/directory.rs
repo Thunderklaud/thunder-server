@@ -8,7 +8,9 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::bson::DateTime;
 use tracing::{event, Level};
 
-use crate::controller::utils::{extract_object_id, extract_object_id_or_die};
+use crate::controller::utils::{
+    extract_object_id, extract_object_id_or_die, get_archive_file_stream_http_response,
+};
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::entities::directory::{
@@ -155,37 +157,24 @@ pub async fn get_directory_archive_stream(
     let dir = DirectoryDAO::get_with_user(id, extract_user_oid(&_authenticated)).await?;
     match dir {
         Some(mut dir) => {
-            let mut archive_method = ArchiveMethod::Tar;
-            if let Some(archive) = &query_params.archive {
-                match archive.as_str() {
-                    "zip" => archive_method = ArchiveMethod::Zip,
-                    "tar.gz" => archive_method = ArchiveMethod::TarGz,
-                    _ => archive_method = ArchiveMethod::Tar,
-                }
-            }
+            let archive_method =
+                ArchiveMethod::extract_from_str_option(&query_params.archive, ArchiveMethod::Tar);
 
-            let file_name = format!(
-                "{}.{}",
-                match (&dir.name).as_str() {
-                    "/" => {
-                        dir.name = "root".to_string();
-                        "root"
-                    }
-                    _ => &dir.name,
-                },
-                archive_method.extension()
+            return get_archive_file_stream_http_response(
+                archive_method,
+                format!(
+                    "{}.{}",
+                    match (&dir.name).as_str() {
+                        "/" => {
+                            dir.name = "root".to_string();
+                            "root"
+                        }
+                        _ => &dir.name,
+                    },
+                    archive_method.extension()
+                ),
+                StorageProvider::get_compressed_directory_stream(&dir, archive_method).await?,
             );
-            let rx = StorageProvider::get_compressed_directory_stream(&dir, archive_method).await?;
-
-            return Ok(HttpResponse::Ok()
-                .content_type(archive_method.content_type())
-                .append_header(archive_method.content_encoding())
-                .append_header(("Content-Transfer-Encoding", "binary"))
-                .append_header((
-                    "Content-Disposition",
-                    format!("attachment; filename={:?}", file_name),
-                ))
-                .body(actix_web::body::BodyStream::new(rx)));
         }
         _ => Err(actix_web::error::ErrorInternalServerError(
             "Could not get requested directory",
