@@ -126,6 +126,14 @@ async fn main() -> Result<()> {
                             .route("/", web::delete().to(controller::share::delete_share))
                             .route("/download", web::get().to(controller::share::download))
                             .route(
+                                "/directory",
+                                web::post().to(controller::share::create_directory_share),
+                            )
+                            .route(
+                                "/directory",
+                                web::get().to(controller::share::get_share_infos_for_directory),
+                            )
+                            .route(
                                 "/file",
                                 web::post().to(controller::share::create_file_share),
                             )

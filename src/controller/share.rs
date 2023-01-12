@@ -2,15 +2,20 @@ use crate::archive::ArchiveMethod;
 use actix_jwt_authc::Authenticated;
 use actix_web::web::Json;
 use actix_web::{web, HttpRequest, HttpResponse};
+use mongodb::bson::oid::ObjectId;
 use mongodb::bson::DateTime;
+use std::str::FromStr;
 
 use crate::controller::utils::get_archive_file_stream_http_response;
 use crate::database::daos::dao::DAO;
 use crate::database::daos::directory_dao::DirectoryDAO;
 use crate::database::daos::file_dao::FileDAO;
 use crate::database::daos::share_dao::ShareDAO;
+use crate::database::entities::directory::DirectoryGet;
 use crate::database::entities::file::GetSingleQueryParams;
-use crate::database::entities::share::{FileShareCreate, Share, ShareDelete, ShareGet, ShareType};
+use crate::database::entities::share::{
+    DirectoryShareCreate, FileShareCreate, Share, ShareDelete, ShareGet, ShareType,
+};
 use crate::jwt_utils::extract_user_oid;
 use crate::storage::storage_provider::StorageProvider;
 use crate::Claims;
@@ -130,6 +135,27 @@ pub async fn get_share_infos_for_file(
     ))
 }
 
+pub async fn get_share_infos_for_directory(
+    _authenticated: Authenticated<Claims>,
+    share_get_data: web::Query<DirectoryGet>,
+) -> actix_web::Result<HttpResponse> {
+    if let Some(dir_id) = &share_get_data.id {
+        if let Ok(dir_id) = ObjectId::from_str(dir_id.as_str()) {
+            if let Some(dir) =
+                DirectoryDAO::get_with_user(dir_id, extract_user_oid(&_authenticated)).await?
+            {
+                if let Ok(shares) = ShareDAO::get_all_for_corresponding_id(dir.id.unwrap()).await {
+                    return Ok(HttpResponse::Ok().json(shares));
+                }
+            }
+        }
+    }
+
+    Err(actix_web::error::ErrorBadRequest(
+        "Requested directory or shares could not be found",
+    ))
+}
+
 pub async fn get_share_infos_for_user(
     _authenticated: Authenticated<Claims>,
 ) -> actix_web::Result<HttpResponse> {
@@ -165,6 +191,32 @@ pub async fn create_file_share(
 
     Err(actix_web::error::ErrorBadRequest(
         "Requested file could not be found",
+    ))
+}
+
+pub async fn create_directory_share(
+    _authenticated: Authenticated<Claims>,
+    create_share_data: Json<DirectoryShareCreate>,
+) -> actix_web::Result<HttpResponse> {
+    let user_id = extract_user_oid(&_authenticated);
+
+    if let Some(dir) = DirectoryDAO::get_with_user((&create_share_data.id).clone(), user_id).await?
+    {
+        let mut share = Share::new(
+            ShareType::Directory,
+            dir.id.unwrap(),
+            user_id,
+            create_share_data.label.to_string(),
+            create_share_data.max_dl_count,
+            create_share_data.valid_until,
+        );
+        let share_id = ShareDAO::insert(&mut share).await?;
+
+        return Ok(HttpResponse::Ok().json(share_id));
+    }
+
+    Err(actix_web::error::ErrorBadRequest(
+        "Requested directory could not be found",
     ))
 }
 
